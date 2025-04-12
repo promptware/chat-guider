@@ -27,66 +27,63 @@ type Params = {
   passengers: Parameter<number>;
 };
 
-const specOf = {
-  arrival: {
-    requires: ['departure'],
-    influencedBy: ['date'],
-    fetchOptions: async (params: { departure: string, date?: string }): Promise<string[]> => {
-      return [];
-    }
-  },
-  departure: {
-    requires: [],
-    influencedBy: ['arrival'],
-    fetchOptions: async (params: { arrival?: string }): Promise<string[]> => {
-      return [];
-    }
-  },
-  date: {
-    requires: ['departure', 'arrival'],
-    influencedBy: ['passengers'],
-    fetchOptions: async (params: { departure: string, arrival: string, passengers: number }): Promise<string[]> => {
-      return [];
-    }
-  },
-  passengers: {
-    requires: ['departure', 'arrival', 'date'],
-    influencedBy: [],
-    fetchOptions: async (params: { departure: string, arrival: string, date: string }): Promise<string[]> => {
-      return [];
-    }
-  }
-}
+type FetchOptionsParams<
+  A,
+  R extends keyof A,
+  I extends keyof A
+> = {
+  [P in R]: A[P] extends Parameter<infer U> ? U : never;
+} & {
+  [P in I]?: A[P] extends Parameter<infer U> ? U : never;
+};
 
-type ParamSpec<A, K, T> = {
-  requires: Exclude<keyof A, K>[];
-  influencedBy: Exclude<keyof A, K>[];
-  fetchOptions: () => Promise<T[]>;
+type ParamSpec<
+  A,
+  K extends keyof A,
+  T,
+  R extends Exclude<keyof A, K>,
+  I extends Exclude<keyof A, K>
+> = {
+  requires: R[];
+  influencedBy: I[];
+  fetchOptions: (params: FetchOptionsParams<A, R, I>) => Promise<T[]>;
 };
 
 type Spec<A extends Record<string, Parameter<any>>> = {
-  [K in keyof A]: A[K] extends Parameter<infer T> ? ParamSpec<A, K, T> : never;
+  [K in keyof A]: A[K] extends Parameter<infer T>
+    ? // We leave R and I generic so that when you write an object literal their
+      // literal types are inferred.
+      ParamSpec<A, K, T, Exclude<keyof A, K>, Exclude<keyof A, K>>
+    : never;
 };
 
-const spec: Spec<Params> = {
+const specOf: Spec<Params> = {
   arrival: {
-    requires: [],
-    influencedBy: [],
-    fetchOptions: async () => ['asd'],
+    requires: ['departure'] as const,
+    influencedBy: ['date'] as const,
+    fetchOptions: async (params: { departure: string; passengers: number; date?: string }): Promise<string[]> => {
+      return [];
+    }
   },
   departure: {
-    requires: ["date"],
-    influencedBy: [],
-    fetchOptions: async () => ['asd'],
+    requires: [] as const,
+    influencedBy: ['arrival'] as const,
+    fetchOptions: async (params: { date: string }): Promise<string[]> => {
+      return [];
+    }
   },
   date: {
-    requires: ["passengers"],
-    influencedBy: [],
-    fetchOptions: async () => ['asd'],
+    requires: ['departure', 'arrival'] as const,
+    influencedBy: ['passengers'] as const,
+    fetchOptions: async (params: { departure: string; arrival: string; passengers: number }): Promise<string[]> => {
+      return [];
+    }
   },
   passengers: {
-    requires: ["date"],
-    influencedBy: [],
-    fetchOptions: async () => [1],
-  },
+    requires: ['departure', 'arrival', 'date'] as const,
+    influencedBy: [] as const,
+    fetchOptions: async (params: { departure: string; arrival: string; date: string }): Promise<number[]> => {
+      return [];
+    }
+  }
 };
