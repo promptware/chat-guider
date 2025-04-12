@@ -57,21 +57,36 @@ const specOf = {
     }
   }
 }
-type ParamSpec<T> = T;
 
-// type Spec<A, T> = {
-//   [K in keyof A]: ParamSpec<A[K] extends Parameter<T> ? T : never>;
-// }
+type ParamSpec<A, K, T> = {
+  requires: Exclude<keyof A, K>[];
+  influencedBy: Exclude<keyof A, K>[];
+  fetchOptions: () => Promise<T[]>;
+};
 
 type Spec<A extends Record<string, Parameter<any>>> = {
-  [K in keyof A]: A[K] extends Parameter<infer T> ? T : never;
+  [K in keyof A]: A[K] extends Parameter<infer T> ? ParamSpec<A, K, T> : never;
 };
 
 const spec: Spec<Params> = {
-  arrival: 'asd',
-  departure: "asdasd",
-  date: "asdasd",
-  passengers: 2
+  arrival: {
+    requires: [],
+    influencedBy: [],
+    fetchOptions: async () => ['asd'],
+  },
+  departure: {
+    requires: ["date"],
+    influencedBy: [],
+    fetchOptions: async () => ['asd'],
+  },
+  date: {
+    requires: ["passengers"],
+    influencedBy: [],
+    fetchOptions: async () => ['asd'],
+  },
+  passengers: {
+    requires: ["date"],
+    influencedBy: [],
+    fetchOptions: async () => [1],
+  },
 };
-
-// const refined = refine<Params, any>({});
