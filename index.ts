@@ -1,24 +1,16 @@
+// index.ts
+
+// ─── Core Types ───────────────────────────────────────────
+
 type ParameterState<A> =
-  { tag: 'empty' } |
-  { tag: 'provided', value: string } |
-  { tag: 'specified', value: A };
+  | { tag: 'empty' }
+  | { tag: 'provided'; value: string }
+  | { tag: 'specified'; value: A };
 
 type Parameter<A> = {
-  state: ParameterState<A>,
+  state: ParameterState<A>;
   description: string;
 };
-
-type ParameterLabel<A> = keyof A;
-
-type Refinement<A, K extends keyof A> =
-  { tag: 'done' } |
-  { tag: 'provide', parameter: K, options: A[K] };
-
-async function refine<A, K extends keyof A> (
-  params: A
-): Promise<Refinement<A, K>> {
-  return { tag: 'done' }
-}
 
 type Params = {
   departure: Parameter<string>;
@@ -27,63 +19,108 @@ type Params = {
   passengers: Parameter<number>;
 };
 
+// ─── Helper Types ─────────────────────────────────────────
+
+type LiteralKeys<T extends readonly (string | number | symbol)[]> = T[number];
+
 type FetchOptionsParams<
   A,
   R extends keyof A,
   I extends keyof A
 > = {
-  [P in R]: A[P] extends Parameter<infer U> ? U : never;
+  [P in R]-?: A[P] extends Parameter<infer U> ? U : never;
 } & {
   [P in I]?: A[P] extends Parameter<infer U> ? U : never;
 };
 
-type ParamSpec<
-  A,
-  K extends keyof A,
-  T,
-  R extends Exclude<keyof A, K>,
-  I extends Exclude<keyof A, K>
-> = {
-  requires: R[];
-  influencedBy: I[];
-  fetchOptions: (params: FetchOptionsParams<A, R, I>) => Promise<T[]>;
-};
+// ─── Factory ──────────────────────────────────────────────
 
-type Spec<A extends Record<string, Parameter<any>>> = {
-  [K in keyof A]: A[K] extends Parameter<infer T>
-    ? // We leave R and I generic so that when you write an object literal their
-      // literal types are inferred.
-      ParamSpec<A, K, T, Exclude<keyof A, K>, Exclude<keyof A, K>>
-    : never;
-};
+function createSpecFactory<A extends Record<string, Parameter<any>>>() {
+  return function <K extends keyof A>(key: K) {
+    return function <
+      R extends readonly (Exclude<keyof A, K>)[],
+      I extends readonly (Exclude<keyof A, K>)[]
+    >(entry: {
+      requires: R;
+      influencedBy: I;
+      fetchOptions: (
+        params: FetchOptionsParams<A, LiteralKeys<R>, LiteralKeys<I>>
+      ) => Promise<A[K] extends Parameter<infer T> ? T[] : never>;
+    }) {
+      return entry;
+    };
+  };
+}
 
-const specOf: Spec<Params> = {
-  arrival: {
+const makeSpec = createSpecFactory<Params>();
+
+// ─── Valid Spec Definition ────────────────────────────────
+
+const specOf = {
+  arrival: makeSpec("arrival")({
     requires: ['departure'] as const,
     influencedBy: ['date'] as const,
-    fetchOptions: async (params: { departure: string; passengers: number; date?: string }): Promise<string[]> => {
-      return [];
+    fetchOptions: async (params: {departure: string; date?: string;}) => {
+      // { departure: string; date?: string }
+      return ['option'];
     }
-  },
-  departure: {
+  }),
+  departure: makeSpec("departure")({
     requires: [] as const,
     influencedBy: ['arrival'] as const,
+    fetchOptions: async (params) => {
+      // { arrival?: string }
+      return ['option'];
+    }
+  }),
+  date: makeSpec("date")({
+    requires: ['departure', 'arrival'] as const,
+    influencedBy: ['passengers'] as const,
+    fetchOptions: async (params) => {
+      // { departure: string; arrival: string; passengers?: number }
+      return ['option'];
+    }
+  }),
+  passengers: makeSpec("passengers")({
+    requires: ['departure', 'arrival', 'date'] as const,
+    influencedBy: [] as const,
+    fetchOptions: async (params) => {
+      // { departure: string; arrival: string; date: string }
+      return [1];
+    }
+  }),
+};
+
+// ─── Invalid Example (produces type error) ────────────────
+
+const invalidSpec = {
+  departure: makeSpec("departure")({
+    requires: [] as const,
+    influencedBy: ['arrival'] as const,
+    // ❌ 'date' is not allowed here
     fetchOptions: async (params: { date: string }): Promise<string[]> => {
       return [];
     }
-  },
-  date: {
+  }),
+  arrival: makeSpec("arrival")({
+    requires: ['departure'] as const,
+    influencedBy: ['date'] as const,
+    fetchOptions: async (params) => {
+      return ['option'];
+    }
+  }),
+  date: makeSpec("date")({
     requires: ['departure', 'arrival'] as const,
     influencedBy: ['passengers'] as const,
-    fetchOptions: async (params: { departure: string; arrival: string; passengers: number }): Promise<string[]> => {
-      return [];
+    fetchOptions: async (params) => {
+      return ['option'];
     }
-  },
-  passengers: {
+  }),
+  passengers: makeSpec("passengers")({
     requires: ['departure', 'arrival', 'date'] as const,
     influencedBy: [] as const,
-    fetchOptions: async (params: { departure: string; arrival: string; date: string }): Promise<number[]> => {
-      return [];
+    fetchOptions: async (params) => {
+      return [1];
     }
-  }
+  }),
 };
