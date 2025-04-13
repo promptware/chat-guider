@@ -1,3 +1,4 @@
+import _ from 'lodash';
 // index.ts
 
 // ─── Core Types ───────────────────────────────────────────
@@ -9,7 +10,6 @@ type ParameterState<A> =
 
 type Parameter<A> = {
   state: ParameterState<A>;
-  description: string;
 };
 
 // ─── Helper Types ─────────────────────────────────────────
@@ -35,6 +35,7 @@ type ParamSpec<
   I extends readonly (Exclude<keyof A, K>)[]
 > = {
   requires: R;
+  description: string;
   influencedBy: I;
   fetchOptions: (
     params: FetchOptionsParams<A, LiteralKeys<R>, LiteralKeys<I>>
@@ -52,67 +53,17 @@ function createSpecFactory<A extends Record<string, Parameter<any>>>() {
   };
 }
 
-// ─── Valid Spec Definition ────────────────────────────────
+function initParams<A extends Record<string, Parameter<any>>>(spec: Spec<A>): A {
+  const res = {} as { [K in keyof A]: Parameter<any> };
 
-type Params = {
-  departure: Parameter<string>;
-  arrival: Parameter<string>;
-  date: Parameter<string>;
-  passengers: Parameter<number>;
-};
+  for (const key of Object.keys(spec) as (keyof A)[]) {
+    res[key] = {
+      state: { tag: 'empty' },
+    };
+  }
 
-const entries = [
-  { departure: "London", arrival: "New York", date: "2026-10-01", seats: 100 },
-  { departure: "London", arrival: "New York", date: "2026-10-02", seats: 1 },
-  { departure: "Berlin", arrival: "New York", date: "2026-10-03", seats: 2 },
-  { departure: "Berlin", arrival: "London", date: "2026-10-04", seats: 2 },
-];
-
-const makeSpec = createSpecFactory<Params>();
-
-type Spec<A extends Record<string, Parameter<any>>> = {
-  [K in keyof A]: A[K] extends Parameter<infer _>
-    ? ParamSpec<A, K, Exclude<keyof A, K>[], Exclude<keyof A, K>[]>
-    : never;
-};
-
-const spec: Spec<Params> = {
-  arrival: makeSpec("arrival")({
-    requires: ['departure'],
-    influencedBy: ['date'],
-    fetchOptions: async (filters: {departure: string; date?: string;}) => {
-      return entries.filter(
-        entry =>
-          filters.departure === entry.departure && (typeof filters.date === 'undefined' ? true : entry.date === filters.date)
-      ).map(entry => entry.arrival);
-    }
-  }),
-  departure: makeSpec("departure")({
-    requires: ["arrival"],
-    influencedBy: ['arrival'],
-    fetchOptions: async (params) => {
-      // { arrival?: string }
-      return ['option'];
-    }
-  }),
-  date: makeSpec("date")({
-    requires: ['departure', 'arrival'],
-    influencedBy: ['passengers'],
-    fetchOptions: async (params) => {
-      // { departure: string; arrival: string; passengers?: number }
-      return ['option'];
-    }
-  }),
-  passengers: makeSpec("passengers")({
-    requires: ['departure', 'arrival', 'date'],
-    influencedBy: [],
-    fetchOptions: async (params) => {
-      // { departure: string; arrival: string; date: string }
-      return [1];
-    }
-  }),
-};
-
+  return res as A;
+}
 
 function detectRequiresCycles<T extends Record<string, any>>(spec: Spec<T>): string[][] {
   const visited = new Set<string>();
@@ -147,51 +98,91 @@ function detectRequiresCycles<T extends Record<string, any>>(spec: Spec<T>): str
   return cycles;
 }
 
-console.log(spec, detectRequiresCycles(spec));
+// ─── Valid Spec Definition ────────────────────────────────
 
-function initParams<A extends Record<string, Parameter<any>>>(spec: Spec<A>): A {
-  const res = {} as { [K in keyof A]: Parameter<any> };
+type Params = {
+  departure: Parameter<string>;
+  arrival: Parameter<string>;
+  date: Parameter<string>;
+  passengers: Parameter<number>;
+};
 
-  for (const key of Object.keys(spec) as (keyof A)[]) {
-    res[key] = {
-      state: { tag: 'empty' },
-      description: ''
-    };
-  }
+const makeSpec = createSpecFactory<Params>();
 
-  return res as A;
-}
+type Spec<A extends Record<string, Parameter<any>>> = {
+  [K in keyof A]: A[K] extends Parameter<infer _>
+    ? ParamSpec<A, K, Exclude<keyof A, K>[], Exclude<keyof A, K>[]>
+    : never;
+};
 
-// ─── Invalid Example (produces type error) ────────────────
+const entries = [
+  { departure: "London", arrival: "New York", date: "2026-10-01", seats: 100 },
+  { departure: "London", arrival: "New York", date: "2026-10-02", seats: 1 },
+  { departure: "Berlin", arrival: "New York", date: "2026-10-03", seats: 2 },
+  { departure: "Berlin", arrival: "London", date: "2026-10-04", seats: 2 },
+];
 
-const invalidSpec = {
-  departure: makeSpec("departure")({
-    requires: [],
-    influencedBy: ['arrival'],
-    // ❌ 'date' is not allowed here
-    fetchOptions: async (params: { date: string }): Promise<string[]> => {
-      return [];
-    }
-  }),
+const spec: Spec<Params> = {
   arrival: makeSpec("arrival")({
+    description: "City of arrival",
     requires: ['departure'],
     influencedBy: ['date'],
-    fetchOptions: async (params) => {
-      return ['option'];
+    fetchOptions: async (filters: { departure: string; date?: string }) => {
+      const matches = entries.filter(entry =>
+        entry.departure === filters.departure &&
+        (filters.date ? entry.date === filters.date : true)
+      );
+      return _.uniq(matches.map(e => e.arrival));
     }
   }),
+
+  departure: makeSpec("departure")({
+    description: "City of departure",
+    requires: ['arrival'],
+    influencedBy: ['arrival'],
+    fetchOptions: async (filters: { arrival?: string }) => {
+      const matches = entries.filter(entry =>
+        (filters.arrival ? entry.arrival === filters.arrival : true)
+      );
+      return _.uniq(matches.map(e => e.departure));
+    }
+  }),
+
   date: makeSpec("date")({
+    description: "Date of departure",
     requires: ['departure', 'arrival'],
     influencedBy: ['passengers'],
-    fetchOptions: async (params) => {
-      return ['option'];
+    fetchOptions: async (filters: {
+      departure: string;
+      arrival: string;
+      passengers?: number;
+    }) => {
+      const matches = entries.filter(entry =>
+        entry.departure === filters.departure &&
+        entry.arrival === filters.arrival &&
+        (filters.passengers ? entry.seats >= filters.passengers : true)
+      );
+      return _.uniq(matches.map(e => e.date));
     }
   }),
+
   passengers: makeSpec("passengers")({
+    description: "Number of passengers",
     requires: ['departure', 'arrival', 'date'],
     influencedBy: [],
-    fetchOptions: async (params) => {
-      return [1];
+    fetchOptions: async (filters: {
+      departure: string;
+      arrival: string;
+      date: string;
+    }) => {
+      const matches = entries.filter(entry =>
+        entry.departure === filters.departure &&
+        entry.arrival === filters.arrival &&
+        entry.date === filters.date
+      );
+      return _.uniq(matches.map(e => e.seats));
     }
   }),
 };
+
+console.log(spec, detectRequiresCycles(spec));
