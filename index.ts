@@ -28,18 +28,25 @@ type FetchOptionsParams<
 
 // ─── Factory ──────────────────────────────────────────────
 
+type ParamSpec<
+  A,
+  K extends keyof A,
+  R extends readonly (Exclude<keyof A, K>)[],
+  I extends readonly (Exclude<keyof A, K>)[]
+> = {
+  requires: R;
+  influencedBy: I;
+  fetchOptions: (
+    params: FetchOptionsParams<A, LiteralKeys<R>, LiteralKeys<I>>
+  ) => Promise<A[K] extends Parameter<infer T> ? T[] : never>;
+}
+
 function createSpecFactory<A extends Record<string, Parameter<any>>>() {
   return function <K extends keyof A>(_key: K) {
     return function <
       R extends readonly (Exclude<keyof A, K>)[],
       I extends readonly (Exclude<keyof A, K>)[]
-    >(entry: {
-      requires: R;
-      influencedBy: I;
-      fetchOptions: (
-        params: FetchOptionsParams<A, LiteralKeys<R>, LiteralKeys<I>>
-      ) => Promise<A[K] extends Parameter<infer T> ? T[] : never>;
-    }) {
+      >(entry: ParamSpec<A, K, R, I>) {
       return entry;
     };
   };
@@ -63,7 +70,13 @@ const entries = [
 
 const makeSpec = createSpecFactory<Params>();
 
-const specOf = {
+type Spec<A extends Record<string, Parameter<any>>> = {
+  [K in keyof A]: A[K] extends Parameter<infer _>
+    ? ParamSpec<A, K, Exclude<keyof A, K>[], Exclude<keyof A, K>[]>
+    : never;
+};
+
+const spec: Spec<Params> = {
   arrival: makeSpec("arrival")({
     requires: ['departure'],
     influencedBy: ['date'],
@@ -75,7 +88,7 @@ const specOf = {
     }
   }),
   departure: makeSpec("departure")({
-    requires: [],
+    requires: ["arrival"],
     influencedBy: ['arrival'],
     fetchOptions: async (params) => {
       // { arrival?: string }
@@ -99,6 +112,42 @@ const specOf = {
     }
   }),
 };
+
+
+function detectRequiresCycles<T extends Record<string, any>>(spec: Spec<T>): string[][] {
+  const visited = new Set<string>();
+  const inStack = new Set<string>();
+  const cycles: string[][] = [];
+
+  function dfs(node: string, path: string[]) {
+    if (inStack.has(node)) {
+      const cycleStart = path.indexOf(node);
+      cycles.push([...path.slice(cycleStart), node]);
+      return;
+    }
+
+    if (visited.has(node)) return;
+
+    visited.add(node);
+    inStack.add(node);
+
+    const requires = spec[node]?.requires ?? [];
+    for (const neighbor of requires) {
+      // @ts-expect-error: may be a symbol or a number
+      dfs(neighbor, [...path, node]);
+    }
+
+    inStack.delete(node);
+  }
+
+  for (const key of Object.keys(spec)) {
+    dfs(key, []);
+  }
+
+  return cycles;
+}
+
+console.log(spec, detectRequiresCycles(spec));
 
 // ─── Invalid Example (produces type error) ────────────────
 
