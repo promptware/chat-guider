@@ -149,6 +149,19 @@ function detectRequiresCycles<T extends Record<string, any>>(spec: Spec<T>): str
 
 console.log(spec, detectRequiresCycles(spec));
 
+function initParams<A extends Record<string, Parameter<any>>>(spec: Spec<A>): A {
+  const res = {} as { [K in keyof A]: Parameter<any> };
+
+  for (const key of Object.keys(spec) as (keyof A)[]) {
+    res[key] = {
+      state: { tag: 'empty' },
+      description: ''
+    };
+  }
+
+  return res as A;
+}
+
 // ─── Invalid Example (produces type error) ────────────────
 
 const invalidSpec = {
