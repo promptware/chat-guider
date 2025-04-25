@@ -19,5 +19,9 @@
     "onlyBuiltDependencies": [
       "esbuild"
     ]
+  },
+  "dependencies": {
+    "@types/lodash": "^4.17.16",
+    "util": "^0.12.5"
   }
 }
