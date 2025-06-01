@@ -52,7 +52,7 @@ export function combineDependencyValues<
   for (const requiredKey of spec.requires) {
     const param = params[requiredKey as keyof A];
     if (param.state.tag === 'specified') {
-      Object.assign(result, { [requiredKey]: param.state.value.value });
+      Object.assign(result, { [requiredKey]: param.state.value });
     }
   }
 
@@ -60,7 +60,7 @@ export function combineDependencyValues<
   for (const influencedKey of spec.influencedBy) {
     const param = params[influencedKey as keyof A];
     if (param.state.tag === 'specified') {
-      Object.assign(result, { [influencedKey]: param.state.value.value });
+      Object.assign(result, { [influencedKey]: param.state.value });
     }
   }
 

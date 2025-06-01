@@ -18,21 +18,21 @@ export async function askUserForValue<T>(
     ? `\n\nAvailable options:\n${options.map(opt => `- ${opt.id}: ${JSON.stringify(opt.value)}`).join('\n')}`
     : '';
 
-  const prompt = `You are helping a user provide a value for a parameter that is currently empty. 
+  const prompt = `You are helping a user provide a value for a parameter that is currently empty.
 
-Parameter name: "${parameterName}"
-Description: "${description}"${optionsText}
+Parameter name: ${parameterName}
+Description: ${description}
 
-The user needs to provide a value for this parameter. Please ask the user what value they would like to use for this parameter in a clear and helpful way. Your response should include a request for the specific information needed.${
-  options && options.length > 0 
-    ? ' If there are available options, mention them to help guide the user.' 
-    : ''
-}
+${optionsText}
+
+The user needs to provide a value for this parameter. Please ask the user what value they would like to use for this parameter in a clear and helpful way. Your response should include a request for the specific information needed.
+
+DO NOT ask the user to provide "other values" or "other options" - the only valid values are the ones provided in the options list. DO NOT add any other options to the list.
 
 You must respond with a JSON object containing:
 - value: The question/prompt to ask the user for this parameter value
 
-Make your question clear and specific about what kind of value is expected. Be VERY succinct. List the options as markdown list.`;
+Be VERY succinct. List the options as raw text list.`;
 
     const result = await client.generateObject({
       prompt,

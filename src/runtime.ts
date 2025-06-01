@@ -52,6 +52,8 @@ export async function initParams<A extends Record<string, Parameter<any>>>(
 ): Promise<A> {
   const params = {} as A;
   for (const key of Object.keys(spec) as Array<keyof A>) {
+    // TODO: potential optimization: if there are no required dependencies and no influencedBy,
+    // we can fetch options immediately
     params[key] = makeParameter<A, typeof key>(key) as A[typeof key];
     if (spec[key].requires.length === 0) {
       params[key].options = {
@@ -65,24 +67,28 @@ export async function initParams<A extends Record<string, Parameter<any>>>(
   return params;
 }
 
-export async function specifyParameter(value: string): Promise<any> {
-  // TODO: Implement parameter specification logic
-  return value;
-}
-
 type FlowStep<A> = {
-  type: 'ask',
-  key: keyof A,
-  options: OptionChoice<any>[]
-} | {
   type: 'done',
   params: A,
 } | {
   type: 'refuse-empty-options',
   key: keyof A,
+} | {
+  type: 'need-specify',
+  key: keyof A,
+  userValue: any,
+  options: OptionChoice<any>[]
+} | {
+  type: 'need-fetch-for-update',
+  key: keyof A,
+  filters: any
+} | {
+  type: 'need-fetch-for-ask',
+  key: keyof A,
+  filters: any
 }
 
-export async function flowIteration<A extends Record<string, Parameter<any>>>(spec: Spec<A>, params: A): Promise<FlowStep<A> | null> {
+export function flowIteration<A extends Record<string, Parameter<any>>>(spec: Spec<A>, params: A): FlowStep<A> | null {
   console.log('flowIteration', params);
   if (areAllParametersSpecified(params)) {
     return { type: 'done', params };
@@ -91,30 +97,20 @@ export async function flowIteration<A extends Record<string, Parameter<any>>>(sp
   // find parameters to work with
   for (const key of Object.keys(spec) as Array<keyof A>) {
     const param = params[key];
-    const step: FlowStep<A> | null = await match([param.state, param.options] as const)
+    const step: FlowStep<A> | null = match([param.state, param.options] as const)
       .with([{ tag: "provided" }, { tag: "available", variants: [] }], () => {
         // TODO: consider moving this check close to options fetching logic
         return { type: 'refuse-empty-options' as const, key };
       })
-      .with([{ tag: "provided" }, { tag: "available" }], async ([state, options]) => {
-        param.state = {
-          tag: 'specified',
-          value: await spec[key].specify(state.value, options.variants)
-        };
-        return null;
+      .with([{ tag: "provided" }, { tag: "available" }], ([state, options]) => {
+        return { type: 'need-specify' as const, key, userValue: state.value, options: options.variants };
       })
-      .with([{ tag: "provided" }, { tag: "unknown" }], async () => {
+      .with([{ tag: "provided" }, { tag: "unknown" }], () => {
         // Check if all required options are specified
         if (areAllRequiredOptionsSpecified(spec[key], params)) {
           // Collect the values of all required options
           const allValues = combineDependencyValues(spec[key], params);
-          
-          const options = await spec[key].fetchOptions(allValues);
-          param.options = {
-            tag: 'available',
-            variants: options
-          }
-          return null;
+          return { type: 'need-fetch-for-update' as const, key, filters: allValues };
         } else {
           // skip. we'll try again later.
           return null;
@@ -124,19 +120,17 @@ export async function flowIteration<A extends Record<string, Parameter<any>>>(sp
         // Already specified, nothing to do
         return null;
       })
-      .with([{ tag: "empty" }, P._], async () => {
+      .with([{ tag: "empty" }, P._], () => {
         const areSpecified = areAllRequiredOptionsSpecified(spec[key], params);
         console.log('areSpecified', key, areSpecified, spec[key].requires);
         // Try to fetch options if all required dependencies are specified
-        let options: OptionChoice<any>[] = [];
         if (areSpecified) {
           const allValues = combineDependencyValues(spec[key], params);
           console.log('allValues', allValues);
-          options = await spec[key].fetchOptions(allValues);
           return {
-            type: 'ask' as const,
+            type: 'need-fetch-for-ask' as const,
             key,
-            options
+            filters: allValues
           };
         } else {
           return null;
@@ -148,7 +142,7 @@ export async function flowIteration<A extends Record<string, Parameter<any>>>(sp
     }
   }
 
-  return null;
+  throw new Error('Exhausted all parameters, but haven\'t reached done state');
 }
 
 export async function runFlow<T extends Record<string, Parameter<any>>>(
@@ -164,19 +158,32 @@ export async function runFlow<T extends Record<string, Parameter<any>>>(
   log('initialParams', params);
 
   while (true) {
-    const step = await flowIteration(spec, params);
+    const step = flowIteration(spec, params);
     if (step === null) {
       break;
     }
 
-    if (step.type === 'ask') {
-      const botQuestion = await askUserForValue(String(step.key), spec[step.key].description, step.options);
-      const userAnswer = await askUser(botQuestion);
-      // TODO: handle specifier errors
-      const value = await spec[step.key].specify(userAnswer, step.options);
+    if (step.type === 'need-specify') {
+      const optionChoice = await spec[step.key].specify(step.userValue, step.options);
       params[step.key].state = {
         tag: 'specified',
-        value
+        value: optionChoice.value
+      };
+    } else if (step.type === 'need-fetch-for-update') {
+      const options = await spec[step.key].fetchOptions(step.filters);
+      params[step.key].options = {
+        tag: 'available',
+        variants: options
+      };
+    } else if (step.type === 'need-fetch-for-ask') {
+      const options = await spec[step.key].fetchOptions(step.filters);
+      const botQuestion = await askUserForValue(String(step.key), spec[step.key].description, options);
+      const userAnswer = await askUser(botQuestion);
+      // TODO: handle specifier errors
+      const optionChoice = await spec[step.key].specify(userAnswer, options);
+      params[step.key].state = {
+        tag: 'specified',
+        value: optionChoice.value
       };
     } else if (step.type === 'done') {
       return step.params;
