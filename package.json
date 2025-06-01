@@ -2,16 +2,29 @@
   "name": "guider",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc index.ts"
+    "test": "pnpm test:runtime && pnpm test:types",
+    "test:runtime": "mocha --require ts-node/register test/**/*.ts",
+    "test:types": "tsc --project test-d/tsconfig.json",
+    "test:watch": "mocha --require ts-node/register test/**/*.ts --watch",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "clean": "rm -rf dist"
   },
   "keywords": [],
   "author": "klntsky",
   "license": "ISC",
   "devDependencies": {
+    "@types/chai": "^5.2.2",
+    "@types/lodash": "^4.17.16",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.15.29",
+    "chai": "^5.2.0",
     "lodash": "^4.17.21",
+    "mocha": "^11.5.0",
+    "ts-node": "^10.9.2",
     "tsx": "^4.19.3",
     "typescript": "^5.8.3"
   },
@@ -21,7 +34,6 @@
     ]
   },
   "dependencies": {
-    "@types/lodash": "^4.17.16",
     "util": "^0.12.5"
   }
 }
