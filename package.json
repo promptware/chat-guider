@@ -35,6 +35,7 @@
     ]
   },
   "dependencies": {
+    "ts-pattern": "^5.7.1",
     "util": "^0.12.5"
   }
 }
