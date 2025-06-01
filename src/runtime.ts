@@ -168,26 +168,23 @@ export async function runFlow<T extends Record<string, Parameter<any>>>(
     if (step === null) {
       break;
     }
-    await match(step)
-      .with({ type: 'ask' }, async (step) => {
-        const botQuestion = await askUserForValue(String(step.key), spec[step.key].description, step.options);
-        const userAnswer = await askUser(botQuestion);
-        // TODO: handle specifier errors
-        const value = await spec[step.key].specify(userAnswer, step.options);
-        params[step.key].state = {
-          tag: 'specified',
-          value
-        };
-      })
-      .with({ type: 'done' }, (step) => {
-        
-      })
-      .with({ type: 'refuse-empty-options' }, (step) => {
-        throw new Error(`Parameter '${String(step.key)}' has no available options when trying to specify`);
-      })
-      .exhaustive();
-    console.log('params', params);
-     
+
+    if (step.type === 'ask') {
+      const botQuestion = await askUserForValue(String(step.key), spec[step.key].description, step.options);
+      const userAnswer = await askUser(botQuestion);
+      // TODO: handle specifier errors
+      const value = await spec[step.key].specify(userAnswer, step.options);
+      params[step.key].state = {
+        tag: 'specified',
+        value
+      };
+    } else if (step.type === 'done') {
+      return step.params;
+    } else if (step.type === 'refuse-empty-options') {
+      // TODO: recursively clear specified values until we find a parameter that has available options
+      // TODO: if we can't find such a parameter, throw an error
+      throw new Error(`Parameter '${String(step.key)}' has no available options when trying to specify`);
+    }
   }
   return params;
 }
