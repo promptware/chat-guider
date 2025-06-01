@@ -3,6 +3,8 @@ import { match, P } from 'ts-pattern';
 import type { Parameter, ParamSpec, Spec, OptionChoice } from './types.js';
 import { detectRequiresCycles } from './graph.js';
 import { specifyUsingOpenRouter } from './specify-param.js';
+import { askUserForValue } from './ask.js';
+import { areAllRequiredOptionsSpecified, areAllParametersSpecified, combineDependencyValues } from './spec.js';
 
 async function log(...args: unknown[]) {
   console.log(
@@ -68,54 +70,91 @@ export async function specifyParameter(value: string): Promise<any> {
   return value;
 }
 
-export async function flowLoop<A extends Record<string, Parameter<any>>>(spec: Spec<A>, params: A): Promise<null | A> {
-  const specEntries = Object.entries(spec) as Array<[keyof A, any]>;
-  
-  // Check if every parameter is specified
-  if (specEntries.every(([key]) => 
-    match(params[key].state)
-      .with({ tag: "specified" }, () => true)
-      .with({ tag: "provided" }, () => false)
-      .with({ tag: "empty" }, () => false)
-      .exhaustive()
-  )) {
-    return params;
+type FlowStep<A> = {
+  type: 'ask',
+  key: keyof A,
+  options: OptionChoice<any>[]
+} | {
+  type: 'done',
+  params: A,
+} | {
+  type: 'refuse-empty-options',
+  key: keyof A,
+}
+
+export async function flowIteration<A extends Record<string, Parameter<any>>>(spec: Spec<A>, params: A): Promise<FlowStep<A> | null> {
+  console.log('flowIteration', params);
+  if (areAllParametersSpecified(params)) {
+    return { type: 'done', params };
   }
   
-  // otherwise, find parameters to specify
-  // if some, specify and repeat
+  // find parameters to work with
   for (const key of Object.keys(spec) as Array<keyof A>) {
     const param = params[key];
-    await match([param.state, param.options] as const)
+    const step: FlowStep<A> | null = await match([param.state, param.options] as const)
       .with([{ tag: "provided" }, { tag: "available", variants: [] }], () => {
-        throw new Error(`Parameter '${String(key)}' has no available options when trying to specify`);
+        // TODO: consider moving this check close to options fetching logic
+        return { type: 'refuse-empty-options' as const, key };
       })
       .with([{ tag: "provided" }, { tag: "available" }], async ([state, options]) => {
         param.state = {
           tag: 'specified',
-          value: await spec[key].specify(state.value, options.variants as any)
+          value: await spec[key].specify(state.value, options.variants)
         };
+        return null;
       })
-      .with([{ tag: "provided" }, { tag: "unknown" }], () => {
-        throw new Error(`Parameter '${String(key)}' has unknown options when trying to specify`);
+      .with([{ tag: "provided" }, { tag: "unknown" }], async () => {
+        // Check if all required options are specified
+        if (areAllRequiredOptionsSpecified(spec[key], params)) {
+          // Collect the values of all required options
+          const allValues = combineDependencyValues(spec[key], params);
+          
+          const options = await spec[key].fetchOptions(allValues);
+          param.options = {
+            tag: 'available',
+            variants: options
+          }
+          return null;
+        } else {
+          // skip. we'll try again later.
+          return null;
+        }
       })
       .with([{ tag: "specified" }, P._], () => {
         // Already specified, nothing to do
+        return null;
       })
-      .with([{ tag: "empty" }, P._], () => {
-        throw new Error(`Parameter '${String(key)}' is empty when it should be provided or specified`);
+      .with([{ tag: "empty" }, P._], async () => {
+        const areSpecified = areAllRequiredOptionsSpecified(spec[key], params);
+        console.log('areSpecified', key, areSpecified, spec[key].requires);
+        // Try to fetch options if all required dependencies are specified
+        let options: OptionChoice<any>[] = [];
+        if (areSpecified) {
+          const allValues = combineDependencyValues(spec[key], params);
+          console.log('allValues', allValues);
+          options = await spec[key].fetchOptions(allValues);
+          return {
+            type: 'ask' as const,
+            key,
+            options
+          };
+        } else {
+          return null;
+        }
       })
       .exhaustive();
+    if (step !== null) {
+      return step;
+    }
   }
 
-  // if none, find parameters to ask about
-
-  // if there are none, dead end
-  // (must be unreachable)
-  return null
+  return null;
 }
 
-export async function runFlow<T extends Record<string, Parameter<any>>>(spec: Spec<T>): Promise<T> {
+export async function runFlow<T extends Record<string, Parameter<any>>>(
+  spec: Spec<T>,
+  askUser: (question: string) => Promise<string>
+): Promise<T> {
   const cycles = detectRequiresCycles(spec);
   if (cycles.length) {
     throw new Error(`Your spec contains a cycle: ${cycles[0].join(' -> ')}`);
@@ -125,11 +164,30 @@ export async function runFlow<T extends Record<string, Parameter<any>>>(spec: Sp
   log('initialParams', params);
 
   while (true) {
-    let res = await flowLoop(spec, params);
-    if (res === null) {
+    const step = await flowIteration(spec, params);
+    if (step === null) {
       break;
     }
-    params = res;
+    await match(step)
+      .with({ type: 'ask' }, async (step) => {
+        const botQuestion = await askUserForValue(String(step.key), spec[step.key].description, step.options);
+        const userAnswer = await askUser(botQuestion);
+        // TODO: handle specifier errors
+        const value = await spec[step.key].specify(userAnswer, step.options);
+        params[step.key].state = {
+          tag: 'specified',
+          value
+        };
+      })
+      .with({ type: 'done' }, (step) => {
+        
+      })
+      .with({ type: 'refuse-empty-options' }, (step) => {
+        throw new Error(`Parameter '${String(step.key)}' has no available options when trying to specify`);
+      })
+      .exhaustive();
+    console.log('params', params);
+     
   }
   return params;
-} 
+}

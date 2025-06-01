@@ -1,0 +1,9 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+This project contains:
+
+- negative type safety tests in test-d/types.test-d.ts
+- runtime tests in tests/

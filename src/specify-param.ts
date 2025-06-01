@@ -1,8 +1,6 @@
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { generateObject } from 'ai';
 import { z } from 'zod';
 import type { OptionChoice } from './types.js';
-import { DEFAULT_PARAMETER_SPECIFICATION_MODEL, PARAMETER_SPECIFICATION_TEMPERATURE } from './constants.js';
+import { mkOpenRouter } from './llm.js';
 
 export async function specifyUsingOpenRouter<T>(
   userInput: string,
@@ -10,16 +8,7 @@ export async function specifyUsingOpenRouter<T>(
   parameterName: string,
   useReasoning: boolean = false
 ): Promise<OptionChoice<T>> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    throw new Error('OPENROUTER_API_KEY environment variable is required');
-  }
-
-  const model = process.env.OPENROUTER_MODEL || DEFAULT_PARAMETER_SPECIFICATION_MODEL;
-
-  const openrouter = createOpenRouter({
-    apiKey,
-  });
+  const client = mkOpenRouter();
 
   // Create schema based on whether reasoning is requested
   const responseSchema = useReasoning 
@@ -54,11 +43,9 @@ You must respond with a JSON object containing:
 Choose the option ID that best matches the user's intent, even if there are typos or slight variations in the input.`;
 
   try {
-    const result = await generateObject({
-      model: openrouter(model),
+    const result = await client.generateObject({
       prompt,
       schema: responseSchema,
-      temperature: PARAMETER_SPECIFICATION_TEMPERATURE,
     });
 
     // Look up the full option based on the selected ID

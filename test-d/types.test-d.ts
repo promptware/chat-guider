@@ -282,8 +282,6 @@ const validSpec: Spec<Params> = {
         id: value.toString()
       }));
     },
-    specify: async (value: string, options: OptionChoice<number>[]) => {
-      return options[0];
-    }
+    // specify is omitted
   }),
 };
