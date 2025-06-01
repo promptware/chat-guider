@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
-import { initParams } from '../src/index';
+import { initParams } from '../src/index.js';
 
 describe('Guider', () => {
   describe('initParams', () => {

@@ -1,11 +1,12 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
+    "module": "ES2022",
     "lib": ["ES2022"],
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
@@ -26,8 +27,9 @@
     "test-d"
   ],
   "ts-node": {
+    "esm": true,
     "compilerOptions": {
-      "module": "commonjs"
+      "module": "ES2022"
     }
   }
 } 

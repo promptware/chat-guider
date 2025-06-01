@@ -2,13 +2,14 @@
   "name": "guider",
   "version": "1.0.0",
   "description": "",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "test": "pnpm test:runtime && pnpm test:types",
-    "test:runtime": "mocha --require ts-node/register test/**/*.ts",
+    "test:runtime": "mocha",
     "test:types": "tsc --project test-d/tsconfig.json",
-    "test:watch": "mocha --require ts-node/register test/**/*.ts --watch",
+    "test:watch": "mocha --watch",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "clean": "rm -rf dist"
