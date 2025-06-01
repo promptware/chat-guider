@@ -8,7 +8,7 @@ export function detectRequiresCycles<T extends Record<string, Parameter<any>>>(s
   function dfs(node: string, path: string[]) {
     if (inStack.has(node)) {
       const cycleStart = path.indexOf(node);
-      cycles.push([...path.slice(cycleStart), node]);
+      cycles.push(path.slice(cycleStart));
       return;
     }
 
