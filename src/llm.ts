@@ -19,6 +19,7 @@ export function mkOpenRouter(model: string): OpenRouterClient {
 
   const openrouter = createOpenRouter({
     apiKey,
+    compatibility: 'strict',
   });
 
   return {
@@ -32,6 +33,7 @@ export function mkOpenRouter(model: string): OpenRouterClient {
         prompt: params.prompt,
         schema: params.schema,
         temperature: params.temperature,
+        mode: 'json',
       });
     }
   };
