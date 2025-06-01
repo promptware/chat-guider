@@ -1,13 +1,14 @@
 import { z } from 'zod';
 import type { OptionChoice } from './types.js';
 import { mkOpenRouter } from './llm.js';
+import { PARAMETER_SPECIFICATION_TEMPERATURE, DEFAULT_PARAMETER_SPECIFICATION_MODEL } from './constants.js';
 
 export async function askUserForValue<T>(
   parameterName: string,
   description: string,
   options?: OptionChoice<T>[]
 ): Promise<string> {
-  const client = mkOpenRouter();
+  const client = mkOpenRouter(DEFAULT_PARAMETER_SPECIFICATION_MODEL);
   console.log('askUserForValue', parameterName, description, options);
   // Create schema for value only
   const responseSchema = z.object({
@@ -37,6 +38,7 @@ Be VERY succinct. List the options as raw text list.`;
     const result = await client.generateObject({
       prompt,
       schema: responseSchema,
+      temperature: PARAMETER_SPECIFICATION_TEMPERATURE,
     });
 
     return result.object.value;

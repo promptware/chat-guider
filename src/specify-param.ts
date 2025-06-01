@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { OptionChoice } from './types.js';
 import { mkOpenRouter } from './llm.js';
+import { PARAMETER_SPECIFICATION_TEMPERATURE, DEFAULT_PARAMETER_SPECIFICATION_MODEL } from './constants.js';
 
 export async function specifyUsingOpenRouter<T>(
   userInput: string,
@@ -8,7 +9,7 @@ export async function specifyUsingOpenRouter<T>(
   parameterName: string,
   useReasoning: boolean = false
 ): Promise<OptionChoice<T>> {
-  const client = mkOpenRouter();
+  const client = mkOpenRouter(DEFAULT_PARAMETER_SPECIFICATION_MODEL);
 
   // Create schema based on whether reasoning is requested
   const responseSchema = useReasoning 
@@ -46,6 +47,7 @@ Choose the option ID that best matches the user's intent, even if there are typo
     const result = await client.generateObject({
       prompt,
       schema: responseSchema,
+      temperature: PARAMETER_SPECIFICATION_TEMPERATURE,
     });
 
     // Look up the full option based on the selected ID
