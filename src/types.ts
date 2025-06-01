@@ -3,9 +3,14 @@ export type ParameterState<A> =
   | { tag: 'provided'; value: string }
   | { tag: 'specified'; value: A };
 
+export interface OptionChoice<T> {
+  id: string;
+  value: T;
+}
+
 export type ParameterOptions<A> =
   | { tag: 'unknown' }
-  | { tag: 'available'; variants: { id: string; value: A; }[] };
+  | { tag: 'available'; variants: OptionChoice<A>[] };
 
 export type Parameter<A> = {
   state: ParameterState<A>;
@@ -28,29 +33,20 @@ export type ParamSpec<
   A,
   K extends keyof A,
   R extends (Exclude<keyof A, K>)[],
-  I extends (Exclude<keyof A, K>)[]
+  I extends (Exclude<keyof A, K>)[],
+  T = A[K] extends Parameter<infer U> ? U : never
 > = {
   requires: R;
   description: string;
   influencedBy: I;
   fetchOptions: (
     params: FetchOptionsParams<A, LiteralKeys<R>, LiteralKeys<I>>
-  ) => Promise<
-    A[K] extends Parameter<infer T>
-    ? { value: T; id: string;}[]
-    : never
-    >;
+  ) => Promise<OptionChoice<T>[]>;
   specify: (
     value: string,
-    options: A[K] extends Parameter<infer T>
-      ? [{ value: T; id: string; }]
-      : never
-  ) => Promise<
-    A[K] extends Parameter<infer T>
-    ? { value: T; id: string; }
-    : never
-    >;
-}
+    options: OptionChoice<T>[]
+  ) => Promise<OptionChoice<T>>;
+};
 
 export type Spec<A extends Record<string, Parameter<any>>> = {
   [K in keyof A]: A[K] extends Parameter<infer _>

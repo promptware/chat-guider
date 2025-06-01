@@ -1,7 +1,8 @@
 import * as util from "util";
 import { match, P } from 'ts-pattern';
-import type { Parameter, ParamSpec, Spec } from './types.js';
+import type { Parameter, ParamSpec, Spec, OptionChoice } from './types.js';
 import { detectRequiresCycles } from './graph.js';
+import { specifyUsingOpenRouter } from './specify-param.js';
 
 async function log(...args: unknown[]) {
   console.log(
@@ -20,8 +21,17 @@ export function makeSpec<
   K extends keyof A,
   R extends (Exclude<keyof A, K>)[],
   I extends (Exclude<keyof A, K>)[],
-  >(_key: K, entry: ParamSpec<A, K, R, I>): ParamSpec<A, K, R, I> {
-    return entry;
+  >(
+    _key: K,
+    // Make specify optional, because we want the user to be able to omit it
+    entry: Omit<ParamSpec<A, K, R, I>, 'specify'> & {
+      specify?: ParamSpec<A, K, R, I>['specify']
+    }
+  ): ParamSpec<A, K, R, I> {
+    return {
+      ...entry,
+      specify: entry.specify ?? specifyUsingOpenRouter
+    } as ParamSpec<A, K, R, I>;
 }
 
 function makeParameter<
@@ -59,27 +69,19 @@ export async function specifyParameter(value: string): Promise<any> {
 }
 
 export async function flowLoop<A extends Record<string, Parameter<any>>>(spec: Spec<A>, params: A): Promise<null | A> {
-  // if every parameter is specified,
-  // dispatch
-  let allSpecified = true;
-  for (const key of Object.keys(spec) as Array<keyof A>) {
-    const state = params[key].state;
-    const isSpecified = match(state)
+  const specEntries = Object.entries(spec) as Array<[keyof A, any]>;
+  
+  // Check if every parameter is specified
+  if (specEntries.every(([key]) => 
+    match(params[key].state)
       .with({ tag: "specified" }, () => true)
       .with({ tag: "provided" }, () => false)
       .with({ tag: "empty" }, () => false)
-      .exhaustive();
-    
-    if (!isSpecified) {
-      allSpecified = false;
-      break;
-    }
-  }
-
-  if (allSpecified) {
+      .exhaustive()
+  )) {
     return params;
   }
-
+  
   // otherwise, find parameters to specify
   // if some, specify and repeat
   for (const key of Object.keys(spec) as Array<keyof A>) {
@@ -106,10 +108,6 @@ export async function flowLoop<A extends Record<string, Parameter<any>>>(spec: S
       .exhaustive();
   }
 
-  if (allSpecified) {
-    return params;
-  }
-
   // if none, find parameters to ask about
 
   // if there are none, dead end
@@ -117,7 +115,7 @@ export async function flowLoop<A extends Record<string, Parameter<any>>>(spec: S
   return null
 }
 
-export async function runFlow<T extends Record<string, Parameter<any>>>(spec: Spec<T>): Promise<void> {
+export async function runFlow<T extends Record<string, Parameter<any>>>(spec: Spec<T>): Promise<T> {
   const cycles = detectRequiresCycles(spec);
   if (cycles.length) {
     throw new Error(`Your spec contains a cycle: ${cycles[0].join(' -> ')}`);
@@ -127,9 +125,11 @@ export async function runFlow<T extends Record<string, Parameter<any>>>(spec: Sp
   log('initialParams', params);
 
   while (true) {
-    await flowLoop(spec, params);
+    let res = await flowLoop(spec, params);
+    if (res === null) {
+      break;
+    }
+    params = res;
   }
-
-  // find the ONLY field that does not require anything (throw if more than one)
-  //
+  return params;
 } 

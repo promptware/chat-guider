@@ -2,6 +2,7 @@ import {
   Parameter, 
   Spec,
   makeSpec,
+  OptionChoice,
 } from '../src/index';
 
 import * as _ from 'lodash';
@@ -23,7 +24,7 @@ const invalidSpec1: Spec<SimpleParams1> = {
     fetchOptions: async (filters: { }) => {
       return [{ value: 'test', id: 'test' }];
     },
-    specify: async (value: string, options: [{ value: string; id: string; }]) => {
+    specify: async (value: string, options: OptionChoice<string>[]) => {
       return options[0];
     }
   })
@@ -44,7 +45,7 @@ const invalidSpec2: Spec<SimpleParams2> = {
     fetchOptions: async (filters: { }) => {
       return [{ value: 'test', id: 'test' }];
     },
-    specify: async (value: string, options: [{ value: string; id: string; }]) => {
+    specify: async (value: string, options: OptionChoice<string>[]) => {
       return options[0];
     }
   })
@@ -65,7 +66,7 @@ const invalidSpec3: Spec<SimpleParams3> = {
     fetchOptions: async (filters: { }) => {
       return [{ value: 'test', id: 'test' }];
     },
-    specify: async (value: string, options: [{ value: string; id: string; }]) => {
+    specify: async (value: string, options: OptionChoice<string>[]) => {
       return options[0];
     }
   }),
@@ -74,7 +75,7 @@ const invalidSpec3: Spec<SimpleParams3> = {
     requires: [],
     influencedBy: [],
     fetchOptions: async () => [{ value: 'test', id: 'test' }],
-    specify: async (value: string, options: [{ value: string; id: string; }]) => {
+    specify: async (value: string, options: OptionChoice<string>[]) => {
       return options[0];
     }
   })
@@ -95,7 +96,7 @@ const invalidSpec4: Spec<SimpleParams4> = {
     fetchOptions: async (filters: { }) => {
       return [{ value: 'test', id: 'test' }];
     },
-    specify: async (value: string, options: [{ value: string; id: string; }]) => {
+    specify: async (value: string, options: OptionChoice<string>[]) => {
       return options[0];
     }
   }),
@@ -104,7 +105,7 @@ const invalidSpec4: Spec<SimpleParams4> = {
     requires: [],
     influencedBy: [],
     fetchOptions: async () => [{ value: 'test', id: 'test' }],
-    specify: async (value: string, options: [{ value: string; id: string; }]) => {
+    specify: async (value: string, options: OptionChoice<string>[]) => {
       return options[0];
     }
   })
@@ -125,7 +126,7 @@ const invalidSpec5: Spec<SimpleParams5> = {
     fetchOptions: async (filters: { departure: string }) => {
       return [{ value: 'test', id: 'test' }];
     },
-    specify: async (value: string, options: [{ value: string; id: string; }]) => {
+    specify: async (value: string, options: OptionChoice<string>[]) => {
       return options[0];
     }
   }),
@@ -134,7 +135,7 @@ const invalidSpec5: Spec<SimpleParams5> = {
     requires: [],
     influencedBy: [],
     fetchOptions: async () => [{ value: 'test', id: 'test' }],
-    specify: async (value: string, options: [{ value: string; id: string; }]) => {
+    specify: async (value: string, options: OptionChoice<string>[]) => {
       return options[0];
     }
   })
@@ -155,7 +156,7 @@ const invalidSpec6: Spec<SimpleParams6> = {
     fetchOptions: async (filters: { departure: string }) => {
       return [{ value: 'test', id: 'test' }];
     },
-    specify: async (value: string, options: [{ value: string; id: string; }]) => {
+    specify: async (value: string, options: OptionChoice<string>[]) => {
       return options[0];
     }
   }),
@@ -164,7 +165,7 @@ const invalidSpec6: Spec<SimpleParams6> = {
     requires: [],
     influencedBy: [],
     fetchOptions: async () => [{ value: 'test', id: 'test' }],
-    specify: async (value: string, options: [{ value: string; id: string; }]) => {
+    specify: async (value: string, options: OptionChoice<string>[]) => {
       return options[0];
     }
   })
@@ -185,7 +186,7 @@ const invalidSpec7: Spec<SimpleParams7> = {
     fetchOptions: async (filters: { departure?: string }) => {
       return [{ value: 'test', id: 'test' }];
     },
-    specify: async (value: string, options: [{ value: string; id: string; }]) => {
+    specify: async (value: string, options: OptionChoice<string>[]) => {
       return options[0];
     }
   }),
@@ -220,7 +221,7 @@ const validSpec: Spec<Params> = {
       );
       return _.uniq(matches.map(e => e.arrival)).map(value => ({ value, id: value }));
     },
-    specify: async (value: string, options: [{ value: string; id: string; }]) => {
+    specify: async (value: string, options: OptionChoice<string>[]) => {
       return options[0];
     }
   }),
@@ -235,7 +236,7 @@ const validSpec: Spec<Params> = {
       );
       return _.uniq(matches.map(e => e.departure)).map(value => ({ value, id: value }));
     },
-    specify: async (value: string, options: [{ value: string; id: string; }]) => {
+    specify: async (value: string, options: OptionChoice<string>[]) => {
       return options[0];
     }
   }),
@@ -257,7 +258,7 @@ const validSpec: Spec<Params> = {
       );
       return _.uniq(matches.map(e => e.date)).map(value => ({ value, id: value }));
     },
-    specify: async (value: string, options: [{ value: string; id: string; }]) => {
+    specify: async (value: string, options: OptionChoice<string>[]) => {
       return options[0];
     }
   }),
@@ -281,7 +282,7 @@ const validSpec: Spec<Params> = {
         id: value.toString()
       }));
     },
-    specify: async (value: string, options: [{ value: number; id: string; }]) => {
+    specify: async (value: string, options: OptionChoice<number>[]) => {
       return options[0];
     }
   }),

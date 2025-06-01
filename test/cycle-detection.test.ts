@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import { detectRequiresCycles, makeSpec } from '../src/index.js';
-import type { Spec, Parameter } from '../src/index.js';
+import type { Spec, Parameter, OptionChoice } from '../src/index.js';
 
 describe('Cycle Detection', () => {
   describe('detectRequiresCycles', () => {
@@ -18,21 +18,21 @@ describe('Cycle Detection', () => {
           requires: [],
           influencedBy: [],
           fetchOptions: async () => [{ value: 'a', id: 'a' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         b: makeSpec("b", {
           description: "Parameter B", 
           requires: ['a'],
           influencedBy: [],
           fetchOptions: async (filters: { a: string }) => [{ value: 'b', id: 'b' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         c: makeSpec("c", {
           description: "Parameter C",
           requires: ['a', 'b'],
           influencedBy: [],
           fetchOptions: async (filters: { a: string; b: string }) => [{ value: 'c', id: 'c' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         })
       };
 
@@ -52,14 +52,14 @@ describe('Cycle Detection', () => {
           requires: ['b'],
           influencedBy: [],
           fetchOptions: async (filters: { b: string }) => [{ value: 'a', id: 'a' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         b: makeSpec("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
           fetchOptions: async (filters: { a: string }) => [{ value: 'b', id: 'b' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         })
       };
 
@@ -81,21 +81,21 @@ describe('Cycle Detection', () => {
           requires: ['c'],
           influencedBy: [],
           fetchOptions: async (filters: { c: string }) => [{ value: 'a', id: 'a' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         b: makeSpec("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
           fetchOptions: async (filters: { a: string }) => [{ value: 'b', id: 'b' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         c: makeSpec("c", {
           description: "Parameter C",
           requires: ['b'],
           influencedBy: [],
           fetchOptions: async (filters: { b: string }) => [{ value: 'c', id: 'c' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         })
       };
 
@@ -119,14 +119,14 @@ describe('Cycle Detection', () => {
           requires: ['b'],
           influencedBy: [],
           fetchOptions: async (filters: { b: string }) => [{ value: 'a', id: 'a' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         b: makeSpec("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
           fetchOptions: async (filters: { a: string }) => [{ value: 'b', id: 'b' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         // Second cycle: c -> d -> c
         c: makeSpec("c", {
@@ -134,14 +134,14 @@ describe('Cycle Detection', () => {
           requires: ['d'],
           influencedBy: [],
           fetchOptions: async (filters: { d: string }) => [{ value: 'c', id: 'c' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         d: makeSpec("d", {
           description: "Parameter D",
           requires: ['c'],
           influencedBy: [],
           fetchOptions: async (filters: { c: string }) => [{ value: 'd', id: 'd' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         })
       };
 
@@ -171,7 +171,7 @@ describe('Cycle Detection', () => {
           requires: [],
           influencedBy: [],
           fetchOptions: async () => [{ value: 'root', id: 'root' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         // Cycle: a -> b -> c -> a
         a: makeSpec("a", {
@@ -179,28 +179,28 @@ describe('Cycle Detection', () => {
           requires: ['root', 'c'], // depends on root (acyclic) and c (cyclic)
           influencedBy: [],
           fetchOptions: async (filters: { root: string; c: string }) => [{ value: 'a', id: 'a' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         b: makeSpec("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
           fetchOptions: async (filters: { a: string }) => [{ value: 'b', id: 'b' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         c: makeSpec("c", {
           description: "Parameter C",
           requires: ['b'],
           influencedBy: [],
           fetchOptions: async (filters: { b: string }) => [{ value: 'c', id: 'c' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         leaf: makeSpec("leaf", {
           description: "Leaf parameter",
           requires: ['root'],
           influencedBy: [],
           fetchOptions: async (filters: { root: string }) => [{ value: 'leaf', id: 'leaf' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         })
       };
 
@@ -226,7 +226,7 @@ describe('Cycle Detection', () => {
           requires: [],
           influencedBy: [],
           fetchOptions: async () => [{ value: 'a', id: 'a' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         })
       };
 
@@ -254,42 +254,42 @@ describe('Cycle Detection', () => {
           requires: [],
           influencedBy: [],
           fetchOptions: async () => [{ value: 'a', id: 'a' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         b: makeSpec("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
           fetchOptions: async (filters: { a: string }) => [{ value: 'b', id: 'b' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         c: makeSpec("c", {
           description: "Parameter C",
           requires: ['b', 'e'], // Creates cycle with e
           influencedBy: [],
           fetchOptions: async (filters: { b: string; e: string }) => [{ value: 'c', id: 'c' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         d: makeSpec("d", {
           description: "Parameter D",
           requires: ['c'],
           influencedBy: [],
           fetchOptions: async (filters: { c: string }) => [{ value: 'd', id: 'd' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         e: makeSpec("e", {
           description: "Parameter E",
           requires: ['d'],
           influencedBy: [],
           fetchOptions: async (filters: { d: string }) => [{ value: 'e', id: 'e' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         f: makeSpec("f", {
           description: "Parameter F",
           requires: ['e'],
           influencedBy: [],
           fetchOptions: async (filters: { e: string }) => [{ value: 'f', id: 'f' }],
-          specify: async (value: string, options: [{ value: string; id: string; }]) => options[0]
+          specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         })
       };
 
