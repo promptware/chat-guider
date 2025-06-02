@@ -1,6 +1,6 @@
 import * as util from "util";
 import { match, P } from 'ts-pattern';
-import type { Parameter, ParamSpec, Spec, OptionChoice } from './types.js';
+import type { Parameter, ParamSpec, Flow, OptionChoice } from './types.js';
 import { detectRequiresCycles } from './graph.js';
 import { specifyUsingOpenRouter } from './specify-param.js';
 import { askUserForValue } from './ask.js';
@@ -18,7 +18,7 @@ async function log(...args: unknown[]) {
   );
 }
 
-export function makeSpec<
+export function parameter<
   A extends Record<K, Parameter<any>>,
   K extends keyof A,
   R extends (Exclude<keyof A, K>)[],
@@ -36,25 +36,22 @@ export function makeSpec<
     } as ParamSpec<A, K, R, I>;
 }
 
-function makeParameter<
+function initParam<
   A extends Record<K, Parameter<A[K]>>,
   K extends keyof A,
   >(_key: K): Parameter<A[K]> {
-    const ak: Parameter<A[K]> = {
+    return {
       state: { tag: 'empty' },
       options: { tag: 'unknown' }
     };
-    return ak;
 }
 
 export async function initParams<A extends Record<string, Parameter<any>>>(
-  spec: Spec<A>
+  spec: Flow<A>
 ): Promise<A> {
   const params = {} as A;
   for (const key of Object.keys(spec) as Array<keyof A>) {
-    // TODO: potential optimization: if there are no required dependencies and no influencedBy,
-    // we can fetch options immediately
-    params[key] = makeParameter<A, typeof key>(key) as A[typeof key];
+    params[key] = initParam<A, typeof key>(key) as A[typeof key];
     if (spec[key].requires.length === 0) {
       params[key].options = {
         tag: 'available',
@@ -88,13 +85,14 @@ type FlowStep<A> = {
   filters: any
 }
 
-export function flowIteration<A extends Record<string, Parameter<any>>>(spec: Spec<A>, params: A): FlowStep<A> | null {
+export function flowIteration<A extends Record<string, Parameter<any>>>(spec: Flow<A>, params: A): FlowStep<A> | null {
   console.log('flowIteration', params);
   if (areAllParametersSpecified(params)) {
     return { type: 'done', params };
   }
   
   // find parameters to work with
+  // TODO: add priorities
   for (const key of Object.keys(spec) as Array<keyof A>) {
     const param = params[key];
     const step: FlowStep<A> | null = match([param.state, param.options] as const)
@@ -146,7 +144,7 @@ export function flowIteration<A extends Record<string, Parameter<any>>>(spec: Sp
 }
 
 export async function runFlow<T extends Record<string, Parameter<any>>>(
-  spec: Spec<T>,
+  spec: Flow<T>,
   askUser: (question: string) => Promise<string>
 ): Promise<T> {
   const cycles = detectRequiresCycles(spec);

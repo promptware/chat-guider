@@ -2,9 +2,9 @@ import * as readline from 'readline';
 import _ from 'lodash';
 import { 
   Parameter, 
-  Spec,
-  makeSpec,
-  runFlow
+  Flow,
+  parameter,
+  runFlow,
 } from '../src/index.js';
 
 // Define the parameter types
@@ -26,8 +26,8 @@ const entries = [
 ];
 
 // Define the airline booking spec
-const airlineSpec: Spec<Params> = {
-  arrival: makeSpec("arrival", {
+const airlineSpec: Flow<Params> = {
+  arrival: parameter("arrival", {
     description: "City of arrival",
     requires: ['departure'],
     influencedBy: ['date'],
@@ -40,7 +40,7 @@ const airlineSpec: Spec<Params> = {
     },
   }),
 
-  departure: makeSpec("departure", {
+  departure: parameter("departure", {
     description: "City of departure",
     requires: [],
     influencedBy: ['arrival'],
@@ -52,7 +52,7 @@ const airlineSpec: Spec<Params> = {
     },
   }),
 
-  date: makeSpec("date", {
+  date: parameter("date", {
     description: "Date of departure",
     requires: ['departure', 'arrival'],
     influencedBy: ['passengers'],
@@ -71,7 +71,7 @@ const airlineSpec: Spec<Params> = {
     },
   }),
 
-  passengers: makeSpec("passengers", {
+  passengers: parameter("passengers", {
     description: "Number of passengers",
     requires: ['departure', 'arrival', 'date'],
     influencedBy: [],

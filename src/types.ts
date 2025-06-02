@@ -48,8 +48,6 @@ export type ParamSpec<
   ) => Promise<OptionChoice<T>>;
 };
 
-export type Spec<A extends Record<string, Parameter<any>>> = {
-  [K in keyof A]: A[K] extends Parameter<infer _>
-    ? ParamSpec<A, K, Exclude<keyof A, K>[], Exclude<keyof A, K>[]>
-    : never;
-}; 
+export type Flow<A extends Record<string, Parameter<any>>> = {
+  [K in keyof A]-?: ParamSpec<A, K, Exclude<keyof A, K>[], Exclude<keyof A, K>[]>
+} 

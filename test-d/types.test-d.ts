@@ -1,9 +1,9 @@
-import { 
-  Parameter, 
-  Spec,
-  makeSpec,
+import type { 
+  Flow,
+  Parameter,
   OptionChoice,
-} from '../src/index';
+} from '../src/index.js';
+import { parameter } from '../src/index.js';
 
 import * as _ from 'lodash';
 
@@ -15,8 +15,8 @@ type SimpleParams1 = {
   // arrival is missing but required
 };
 
-const invalidSpec1: Spec<SimpleParams1> = {
-  departure: makeSpec("departure", {
+const invalidSpec1: Flow<SimpleParams1> = {
+  departure: parameter("departure", {
     description: "City of departure", 
     // @ts-expect-error - 'arrival' doesn't exist in SimpleParams1
     requires: ['arrival'],
@@ -36,8 +36,8 @@ type SimpleParams2 = {
   // date is missing but used in influencedBy
 };
 
-const invalidSpec2: Spec<SimpleParams2> = {
-  departure: makeSpec("departure", {
+const invalidSpec2: Flow<SimpleParams2> = {
+  departure: parameter("departure", {
     description: "City of departure",
     requires: [],
     // @ts-expect-error - 'date' doesn't exist in SimpleParams2
@@ -57,8 +57,8 @@ type SimpleParams3 = {
   arrival: Parameter<string>;
 };
 
-const invalidSpec3: Spec<SimpleParams3> = {
-  departure: makeSpec("departure", {
+const invalidSpec3: Flow<SimpleParams3> = {
+  departure: parameter("departure", {
     description: "City of departure",
     // @ts-expect-error - 'nonexistent' is not a valid parameter
     requires: ['nonexistent'],
@@ -70,7 +70,7 @@ const invalidSpec3: Spec<SimpleParams3> = {
       return options[0];
     }
   }),
-  arrival: makeSpec("arrival", {
+  arrival: parameter("arrival", {
     description: "City of arrival",
     requires: [],
     influencedBy: [],
@@ -87,8 +87,8 @@ type SimpleParams4 = {
   arrival: Parameter<string>;
 };
 
-const invalidSpec4: Spec<SimpleParams4> = {
-  departure: makeSpec("departure", {
+const invalidSpec4: Flow<SimpleParams4> = {
+  departure: parameter("departure", {
     description: "City of departure", 
     requires: [],
     // @ts-expect-error - 'nonexistent' is not a valid parameter
@@ -100,7 +100,7 @@ const invalidSpec4: Spec<SimpleParams4> = {
       return options[0];
     }
   }),
-  arrival: makeSpec("arrival", {
+  arrival: parameter("arrival", {
     description: "City of arrival",
     requires: [],
     influencedBy: [],
@@ -117,8 +117,8 @@ type SimpleParams5 = {
   arrival: Parameter<string>;
 };
 
-const invalidSpec5: Spec<SimpleParams5> = {
-  arrival: makeSpec("arrival", {
+const invalidSpec5: Flow<SimpleParams5> = {
+  arrival: parameter("arrival", {
     description: "City of arrival",
     requires: [],
     influencedBy: [],
@@ -130,7 +130,7 @@ const invalidSpec5: Spec<SimpleParams5> = {
       return options[0];
     }
   }),
-  departure: makeSpec("departure", {
+  departure: parameter("departure", {
     description: "City of departure",
     requires: [],
     influencedBy: [],
@@ -147,8 +147,8 @@ type SimpleParams6 = {
   arrival: Parameter<string>;
 };
 
-const invalidSpec6: Spec<SimpleParams6> = {
-  arrival: makeSpec("arrival", {
+const invalidSpec6: Flow<SimpleParams6> = {
+  arrival: parameter("arrival", {
     description: "City of arrival",
     requires: [],
     influencedBy: ['departure'],
@@ -160,7 +160,7 @@ const invalidSpec6: Spec<SimpleParams6> = {
       return options[0];
     }
   }),
-  departure: makeSpec("departure", {
+  departure: parameter("departure", {
     description: "City of departure",
     requires: [],
     influencedBy: [],
@@ -178,8 +178,8 @@ type SimpleParams7 = {
 };
 
 // @ts-expect-error - departure is missing in the spec
-const invalidSpec7: Spec<SimpleParams7> = {
-  arrival: makeSpec("arrival", {
+const invalidSpec7: Flow<SimpleParams7> = {
+  arrival: parameter("arrival", {
     description: "City of arrival",
     requires: [],
     influencedBy: ['departure'],
@@ -208,25 +208,27 @@ const entries = [
   { departure: "Berlin", arrival: "London", date: "2026-10-04", seats: 2 },
 ];
 
-// This should compile without errors - demonstrates the types work correctly
-const validSpec: Spec<Params> = {
-  arrival: makeSpec("arrival", {
-    description: "City of arrival",
-    requires: ['departure'],
-    influencedBy: ['date'],
-    fetchOptions: async (filters: { departure: string; date?: string }) => {
-      const matches = entries.filter(entry =>
-        entry.departure === filters.departure &&
-        (filters.date ? entry.date === filters.date : true)
-      );
-      return _.uniq(matches.map(e => e.arrival)).map(value => ({ value, id: value }));
-    },
-    specify: async (value: string, options: OptionChoice<string>[]) => {
-      return options[0];
-    }
-  }),
+const arrival = parameter<Params, "arrival", ["departure"], ["date"]>("arrival", {
+  description: "City of arrival",
+  requires: ['departure'],
+  influencedBy: ['date'],
+  fetchOptions: async (filters: { departure: string; date?: string }) => {
+    const matches = entries.filter(entry =>
+      entry.departure === filters.departure &&
+      (filters.date ? entry.date === filters.date : true)
+    );
+    return _.uniq(matches.map(e => e.arrival)).map(value => ({ value, id: value }));
+  },
+  specify: async (value: string, options: OptionChoice<string>[]) => {
+    return options[0];
+  }
+})
 
-  departure: makeSpec("departure", {
+// This should compile without errors - demonstrates the types work correctly
+const validSpec: Flow<Params> = {
+  arrival,
+
+  departure: parameter("departure", {
     description: "City of departure",
     requires: [],
     influencedBy: ['arrival'],
@@ -241,7 +243,7 @@ const validSpec: Spec<Params> = {
     }
   }),
 
-  date: makeSpec("date", {
+  date: parameter("date", {
     description: "Date of departure",
     requires: ['departure', 'arrival'],
     influencedBy: ['passengers'],
@@ -263,7 +265,7 @@ const validSpec: Spec<Params> = {
     }
   }),
 
-  passengers: makeSpec("passengers", {
+  passengers: parameter("passengers", {
     description: "Number of passengers",
     requires: ['departure', 'arrival', 'date'],
     influencedBy: [],

@@ -1,6 +1,6 @@
-import type { Spec, Parameter } from './types.js';
+import type { Flow, Parameter } from './types.js';
 
-export function detectRequiresCycles<T extends Record<string, Parameter<any>>>(spec: Spec<T>): string[][] {
+export function detectRequiresCycles<T extends Record<string, Parameter<any>>>(spec: Flow<T>): string[][] {
   const visited = new Set<string>();
   const inStack = new Set<string>();
   const cycles: string[][] = [];

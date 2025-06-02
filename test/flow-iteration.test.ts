@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
-import { initParams, flowIteration, makeSpec } from '../src/index.js';
-import type { Spec, Parameter, OptionChoice } from '../src/index.js';
+import { initParams, flowIteration, parameter } from '../src/index.js';
+import type { Flow, Parameter, OptionChoice } from '../src/index.js';
 
 describe('flowIteration', () => {
   describe('returns type: "done"', () => {
@@ -11,14 +11,14 @@ describe('flowIteration', () => {
         b: Parameter<string>;
       };
 
-      const spec: Spec<TestParams> = {
-        a: makeSpec("a", {
+      const spec: Flow<TestParams> = {
+        a: parameter("a", {
           description: "Parameter A",
           requires: [],
           influencedBy: [],
           fetchOptions: async () => [{ value: 'a1', id: 'a1' }],
         }),
-        b: makeSpec("b", {
+        b: parameter("b", {
           description: "Parameter B", 
           requires: ['a'],
           influencedBy: [],
@@ -46,8 +46,8 @@ describe('flowIteration', () => {
         a: Parameter<string>;
       };
 
-      const spec: Spec<TestParams> = {
-        a: makeSpec("a", {
+      const spec: Flow<TestParams> = {
+        a: parameter("a", {
           description: "Parameter A",
           requires: [],
           influencedBy: [],
@@ -74,14 +74,14 @@ describe('flowIteration', () => {
         b: Parameter<string>;
       };
 
-      const spec: Spec<TestParams> = {
-        a: makeSpec("a", {
+      const spec: Flow<TestParams> = {
+        a: parameter("a", {
           description: "Parameter A",
           requires: [],
           influencedBy: [],
           fetchOptions: async () => [{ value: 'a1', id: 'a1' }],
         }),
-        b: makeSpec("b", {
+        b: parameter("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
@@ -112,8 +112,8 @@ describe('flowIteration', () => {
         a: Parameter<string>;
       };
 
-      const spec: Spec<TestParams> = {
-        a: makeSpec("a", {
+      const spec: Flow<TestParams> = {
+        a: parameter("a", {
           description: "Parameter A",
           requires: [],
           influencedBy: [],
@@ -156,14 +156,14 @@ describe('flowIteration', () => {
         b: Parameter<string>;
       };
 
-      const spec: Spec<TestParams> = {
-        a: makeSpec("a", {
+      const spec: Flow<TestParams> = {
+        a: parameter("a", {
           description: "Parameter A",
           requires: [],
           influencedBy: [],
           fetchOptions: async () => [{ value: 'a1', id: 'a1' }],
         }),
-        b: makeSpec("b", {
+        b: parameter("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
@@ -197,8 +197,8 @@ describe('flowIteration', () => {
         a: Parameter<string>;
       };
 
-      const spec: Spec<TestParams> = {
-        a: makeSpec("a", {
+      const spec: Flow<TestParams> = {
+        a: parameter("a", {
           description: "Parameter A",
           requires: [],
           influencedBy: [],
@@ -227,14 +227,14 @@ describe('flowIteration', () => {
         b: Parameter<string>;
       };
 
-      const spec: Spec<TestParams> = {
-        a: makeSpec("a", {
+      const spec: Flow<TestParams> = {
+        a: parameter("a", {
           description: "Parameter A",
           requires: [],
           influencedBy: [],
           fetchOptions: async () => [{ value: 'a1', id: 'a1' }],
         }),
-        b: makeSpec("b", {
+        b: parameter("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
@@ -266,20 +266,20 @@ describe('flowIteration', () => {
         c: Parameter<string>;
       };
 
-      const spec: Spec<TestParams> = {
-        a: makeSpec("a", {
+      const spec: Flow<TestParams> = {
+        a: parameter("a", {
           description: "Parameter A",
           requires: [],
           influencedBy: [],
           fetchOptions: async () => [{ value: 'a1', id: 'a1' }],
         }),
-        b: makeSpec("b", {
+        b: parameter("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
           fetchOptions: async (filters: { a: string }) => [{ value: 'b1', id: 'b1' }],
         }),
-        c: makeSpec("c", {
+        c: parameter("c", {
           description: "Parameter C",
           requires: ['b'],
           influencedBy: [],
@@ -312,20 +312,20 @@ describe('flowIteration', () => {
         c: Parameter<string>;
       };
 
-      const spec: Spec<TestParams> = {
-        a: makeSpec("a", {
+      const spec: Flow<TestParams> = {
+        a: parameter("a", {
           description: "Parameter A",
           requires: [],
           influencedBy: [],
           fetchOptions: async () => [{ value: 'a1', id: 'a1' }],
         }),
-        b: makeSpec("b", {
+        b: parameter("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
           fetchOptions: async (filters: { a: string }) => [{ value: 'b1', id: 'b1' }],
         }),
-        c: makeSpec("c", {
+        c: parameter("c", {
           description: "Parameter C",
           requires: ['b'],
           influencedBy: [],
@@ -356,14 +356,14 @@ describe('flowIteration', () => {
         b: Parameter<string>;
       };
 
-      const spec: Spec<TestParams> = {
-        a: makeSpec("a", {
+      const spec: Flow<TestParams> = {
+        a: parameter("a", {
           description: "Parameter A",
           requires: [],
           influencedBy: [],
           fetchOptions: async () => [{ value: 'a1', id: 'a1' }],
         }),
-        b: makeSpec("b", {
+        b: parameter("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
