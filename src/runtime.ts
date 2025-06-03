@@ -5,6 +5,7 @@ import { detectRequiresCycles } from './graph.js';
 import { specifyUsingOpenRouter } from './specify-param.js';
 import { askUserForValue } from './ask.js';
 import { areAllRequiredOptionsSpecified, areAllParametersSpecified, combineDependencyValues } from './spec.js';
+import _ from 'lodash';
 
 async function log(...args: unknown[]) {
   console.log(
@@ -49,22 +50,31 @@ function initParam<
 export async function initParams<A extends Record<string, Parameter<any>>>(
   spec: Flow<A>
 ): Promise<A> {
-  const params = {} as A;
+  // Synchronously initialize all params using lodash
+  let params = _.mapValues(spec, (_specEntry, keyString) => {
+    const key = keyString as keyof A;
+    return initParam<A, typeof key>(key);
+  }) as A;
+
   for (const key of Object.keys(spec) as Array<keyof A>) {
-    params[key] = initParam<A, typeof key>(key) as A[typeof key];
     if (spec[key].requires.length === 0) {
-      params[key].options = {
-        tag: 'available',
-        variants: await spec[key].fetchOptions({} as {
-          [P in keyof A]-?: never
-        })
-      }
+      const variants = await spec[key].fetchOptions({} as any);
+      params = {
+        ...params,
+        [key]: {
+          ...params[key],
+          options: {
+            tag: 'available',
+            variants,
+          },
+        },
+      };
     }
   }
   return params;
 }
 
-type FlowStep<A> = {
+type FlowStep<A extends Record<string, Parameter<any>>> = {
   type: 'done',
   params: A,
 } | {
@@ -73,20 +83,20 @@ type FlowStep<A> = {
 } | {
   type: 'need-specify',
   key: keyof A,
-  userValue: any,
-  options: OptionChoice<any>[]
+  userValue: string,
+  options: OptionChoice<unknown>[]
 } | {
   type: 'need-fetch-for-update',
   key: keyof A,
-  filters: any
+  filters: Record<string, unknown>
 } | {
   type: 'need-fetch-for-ask',
   key: keyof A,
-  filters: any
+  filters: Record<string, unknown>
 }
 
-export function flowIteration<A extends Record<string, Parameter<any>>>(spec: Flow<A>, params: A): FlowStep<A> | null {
-  console.log('flowIteration', params);
+export function nextFlowStep<A extends Record<string, Parameter<any>>>(spec: Flow<A>, params: A): FlowStep<A> | null {
+  console.log('nextFlowStep', params);
   if (areAllParametersSpecified(params)) {
     return { type: 'done', params };
   }
@@ -143,6 +153,49 @@ export function flowIteration<A extends Record<string, Parameter<any>>>(spec: Fl
   throw new Error('Exhausted all parameters, but haven\'t reached done state');
 }
 
+async function advanceFlow<T extends Record<string, Parameter<any>>>(
+  spec: Flow<T>,
+  params: T,
+  step: Exclude<FlowStep<T>, { type: 'done' }>,
+  askUser: (question: string) => Promise<string>
+): Promise<T> {
+  const key = step.key;
+  const param = { ...params[key] };
+
+  if (step.type === 'need-specify') {
+    const paramSpec = spec[key];
+    const optionChoice = await paramSpec.specify(step.userValue, step.options as any);
+    param.state = {
+      tag: 'specified',
+      value: optionChoice.value
+    };
+  } else if (step.type === 'need-fetch-for-update') {
+    const paramSpec = spec[key];
+    const options = await paramSpec.fetchOptions(step.filters as any);
+    param.options = {
+      tag: 'available',
+      variants: options
+    };
+  } else if (step.type === 'need-fetch-for-ask') {
+    const paramSpec = spec[key];
+    const options = await paramSpec.fetchOptions(step.filters as any);
+    const botQuestion = await askUserForValue(String(key), paramSpec.description, options);
+    const userAnswer = await askUser(botQuestion);
+    // TODO: handle specifier errors
+    const optionChoice = await paramSpec.specify(userAnswer, options);
+    param.state = {
+      tag: 'specified',
+      value: optionChoice.value
+    };
+  } else if (step.type === 'refuse-empty-options') {
+    // TODO: recursively clear specified values until we find a parameter that has available options
+    // TODO: if we can't find such a parameter, throw an error
+    throw new Error(`Parameter '${String(step.key)}' has no available options when trying to specify`);
+  }
+
+  return { ...params, [key]: param };
+}
+
 export async function runFlow<T extends Record<string, Parameter<any>>>(
   spec: Flow<T>,
   askUser: (question: string) => Promise<string>
@@ -156,40 +209,16 @@ export async function runFlow<T extends Record<string, Parameter<any>>>(
   log('initialParams', params);
 
   while (true) {
-    const step = flowIteration(spec, params);
+    const step = nextFlowStep(spec, params);
     if (step === null) {
       break;
     }
 
-    if (step.type === 'need-specify') {
-      const optionChoice = await spec[step.key].specify(step.userValue, step.options);
-      params[step.key].state = {
-        tag: 'specified',
-        value: optionChoice.value
-      };
-    } else if (step.type === 'need-fetch-for-update') {
-      const options = await spec[step.key].fetchOptions(step.filters);
-      params[step.key].options = {
-        tag: 'available',
-        variants: options
-      };
-    } else if (step.type === 'need-fetch-for-ask') {
-      const options = await spec[step.key].fetchOptions(step.filters);
-      const botQuestion = await askUserForValue(String(step.key), spec[step.key].description, options);
-      const userAnswer = await askUser(botQuestion);
-      // TODO: handle specifier errors
-      const optionChoice = await spec[step.key].specify(userAnswer, options);
-      params[step.key].state = {
-        tag: 'specified',
-        value: optionChoice.value
-      };
-    } else if (step.type === 'done') {
+    if (step.type === 'done') {
       return step.params;
-    } else if (step.type === 'refuse-empty-options') {
-      // TODO: recursively clear specified values until we find a parameter that has available options
-      // TODO: if we can't find such a parameter, throw an error
-      throw new Error(`Parameter '${String(step.key)}' has no available options when trying to specify`);
     }
+
+    params = await advanceFlow(spec, params, step, askUser);
   }
   return params;
 }

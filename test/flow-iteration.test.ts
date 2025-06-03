@@ -1,9 +1,9 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
-import { initParams, flowIteration, parameter } from '../src/index.js';
+import { initParams, nextFlowStep, parameter } from '../src/index.js';
 import type { Flow, Parameter, OptionChoice } from '../src/index.js';
 
-describe('flowIteration', () => {
+describe('nextFlowStep', () => {
   describe('returns type: "done"', () => {
     it('should return done when all parameters are specified', async () => {
       type TestParams = {
@@ -31,7 +31,7 @@ describe('flowIteration', () => {
       params.a.state = { tag: 'specified', value: 'a1' };
       params.b.state = { tag: 'specified', value: 'b1' };
 
-      const result = flowIteration(spec, params);
+      const result = nextFlowStep(spec, params);
       
       expect(result).to.deep.equal({
         type: 'done',
@@ -59,7 +59,7 @@ describe('flowIteration', () => {
       };
 
       const params = await initParams(spec);
-      const result = flowIteration(spec, params);
+      const result = nextFlowStep(spec, params);
       
       expect(result).to.deep.equal({
         type: 'need-fetch-for-ask',
@@ -96,7 +96,7 @@ describe('flowIteration', () => {
       // Specify parameter a
       params.a.state = { tag: 'specified', value: 'a1' };
 
-      const result = flowIteration(spec, params);
+      const result = nextFlowStep(spec, params);
       
       expect(result).to.deep.equal({
         type: 'need-fetch-for-ask',
@@ -135,7 +135,7 @@ describe('flowIteration', () => {
         ]
       };
 
-      const result = flowIteration(spec, params);
+      const result = nextFlowStep(spec, params);
       
       expect(result).to.deep.equal({
         type: 'need-specify',
@@ -181,7 +181,7 @@ describe('flowIteration', () => {
       params.b.state = { tag: 'provided', value: 'user input for b' };
       params.b.options = { tag: 'unknown' };
 
-      const result = flowIteration(spec, params);
+      const result = nextFlowStep(spec, params);
       
       expect(result).to.deep.equal({
         type: 'need-fetch-for-update',
@@ -211,7 +211,7 @@ describe('flowIteration', () => {
       params.a.state = { tag: 'provided', value: 'user input' };
       params.a.options = { tag: 'available', variants: [] };
 
-      const result = flowIteration(spec, params);
+      const result = nextFlowStep(spec, params);
       
       expect(result).to.deep.equal({
         type: 'refuse-empty-options',
@@ -249,7 +249,7 @@ describe('flowIteration', () => {
       params.b.state = { tag: 'provided', value: 'user input for b' };
       params.b.options = { tag: 'unknown' };
 
-      const result = flowIteration(spec, params);
+      const result = nextFlowStep(spec, params);
       
       // Should return need-fetch-for-update for b since a is specified
       expect(result).to.deep.equal({
@@ -295,7 +295,7 @@ describe('flowIteration', () => {
       params.c.state = { tag: 'provided', value: 'user input for c' };
       params.c.options = { tag: 'unknown' };
 
-      const result = flowIteration(spec, params);
+      const result = nextFlowStep(spec, params);
       
       // Should return need-fetch-for-ask for b since its dependencies are satisfied
       expect(result).to.deep.equal({
@@ -340,7 +340,7 @@ describe('flowIteration', () => {
       params.b.options = { tag: 'unknown' };
       // c remains empty but depends on b which is not specified yet
 
-      const result = flowIteration(spec, params);
+      const result = nextFlowStep(spec, params);
       
       // Should return need-fetch-for-update for b
       expect(result).to.deep.equal({
@@ -374,7 +374,7 @@ describe('flowIteration', () => {
       const params = await initParams(spec);
       // Both parameters have empty state, b depends on a
 
-      const result = flowIteration(spec, params);
+      const result = nextFlowStep(spec, params);
       
       // Should return need-fetch-for-ask for 'a' since it has no dependencies
       expect(result).to.deep.equal({

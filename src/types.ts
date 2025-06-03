@@ -50,4 +50,14 @@ export type ParamSpec<
 
 export type Flow<A extends Record<string, Parameter<any>>> = {
   [K in keyof A]-?: ParamSpec<A, K, Exclude<keyof A, K>[], Exclude<keyof A, K>[]>
-} 
+}
+
+/**
+ * Utility type to transform a record of Parameter<T> types into a record of T types.
+ * For example, { foo: Parameter<string>, bar: Parameter<number> } becomes { foo: string, bar: number }.
+ */
+export type ParameterValues<ParamRecord extends Record<string, Parameter<any>>> = {
+  [K in keyof ParamRecord]: ParamRecord[K] extends Parameter<infer ValueType>
+    ? ValueType
+    : never;
+};

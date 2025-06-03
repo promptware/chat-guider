@@ -39,6 +39,7 @@
     "@openrouter/ai-sdk-provider": "^0.7.0",
     "ai": "^4.3.16",
     "dotenv": "^16.5.0",
+    "immer": "^10.1.1",
     "ts-pattern": "^5.7.1",
     "util": "^0.12.5",
     "zod": "^3.25.46"
