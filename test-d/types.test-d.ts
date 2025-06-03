@@ -1,6 +1,5 @@
 import type { 
   Flow,
-  Parameter,
   OptionChoice,
 } from '../src/index.js';
 import { parameter } from '../src/index.js';
@@ -11,7 +10,7 @@ import * as _ from 'lodash';
 
 // Test 1: If a required parameter is not defined, fetchOptions should cause type error
 type SimpleParams1 = {
-  departure: Parameter<string>;
+  departure: string;
   // arrival is missing but required
 };
 
@@ -32,7 +31,7 @@ const invalidSpec1: Flow<SimpleParams1> = {
 
 // Test 2: If an 'influencedBy' parameter is not defined, fetchOptions should cause type error  
 type SimpleParams2 = {
-  departure: Parameter<string>;
+  departure: string;
   // date is missing but used in influencedBy
 };
 
@@ -53,8 +52,8 @@ const invalidSpec2: Flow<SimpleParams2> = {
 
 // Test 3: Reference to non-existing parameter in 'requires' field
 type SimpleParams3 = {
-  departure: Parameter<string>;
-  arrival: Parameter<string>;
+  departure: string;
+  arrival: string;
 };
 
 const invalidSpec3: Flow<SimpleParams3> = {
@@ -83,8 +82,8 @@ const invalidSpec3: Flow<SimpleParams3> = {
 
 // Test 4: Reference to non-existing parameter in 'influencedBy' field
 type SimpleParams4 = {
-  departure: Parameter<string>;
-  arrival: Parameter<string>;
+  departure: string;
+  arrival: string;
 };
 
 const invalidSpec4: Flow<SimpleParams4> = {
@@ -113,8 +112,8 @@ const invalidSpec4: Flow<SimpleParams4> = {
 
 // Test 5: Missing required parameters in fetchOptions should error
 type SimpleParams5 = {
-  departure: Parameter<string>;
-  arrival: Parameter<string>;
+  departure: string;
+  arrival: string;
 };
 
 const invalidSpec5: Flow<SimpleParams5> = {
@@ -143,8 +142,8 @@ const invalidSpec5: Flow<SimpleParams5> = {
 
 // Test 6: Optional parameter is not a required parameter
 type SimpleParams6 = {
-  departure: Parameter<string>;
-  arrival: Parameter<string>;
+  departure: string;
+  arrival: string;
 };
 
 const invalidSpec6: Flow<SimpleParams6> = {
@@ -173,8 +172,8 @@ const invalidSpec6: Flow<SimpleParams6> = {
 
 // Test 7: Missing parameter in a spec
 type SimpleParams7 = {
-  departure: Parameter<string>;
-  arrival: Parameter<string>;
+  departure: string;
+  arrival: string;
 };
 
 // @ts-expect-error - departure is missing in the spec
@@ -195,10 +194,10 @@ const invalidSpec7: Flow<SimpleParams7> = {
 // ─── Valid Spec (Positive Test) ─────────────────────────────────────
 
 type Params = {
-  departure: Parameter<string>;
-  arrival: Parameter<string>;
-  date: Parameter<string>;
-  passengers: Parameter<number>;
+  departure: string;
+  arrival: string;
+  date: string;
+  passengers: number;
 };
 
 const entries = [

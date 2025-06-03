@@ -1,6 +1,6 @@
 import * as util from "util";
 import { match, P } from 'ts-pattern';
-import type { Parameter, ParamSpec, Flow, OptionChoice } from './types.js';
+import type { Parameter, ParamSpec, Flow, OptionChoice, Parameterized, SomeParameterType } from './types.js';
 import { detectRequiresCycles } from './graph.js';
 import { specifyUsingOpenRouter } from './specify-param.js';
 import { askUserForValue } from './ask.js';
@@ -20,43 +20,42 @@ async function log(...args: unknown[]) {
 }
 
 export function parameter<
-  A extends Record<K, Parameter<any>>,
-  K extends keyof A,
-  R extends (Exclude<keyof A, K>)[],
-  I extends (Exclude<keyof A, K>)[],
-  >(
-    _key: K,
-    // Make specify optional, because we want the user to be able to omit it
-    entry: Omit<ParamSpec<A, K, R, I>, 'specify'> & {
-      specify?: ParamSpec<A, K, R, I>['specify']
-    }
-  ): ParamSpec<A, K, R, I> {
-    return {
-      ...entry,
-      specify: entry.specify ?? specifyUsingOpenRouter
-    } as ParamSpec<A, K, R, I>;
+  D extends Record<string, SomeParameterType>,
+  K extends keyof D,
+  R extends (Exclude<keyof D, K>)[],
+  I extends (Exclude<keyof D, K>)[],
+>(
+  _key: K,
+  entry: Omit<ParamSpec<D, K, R, I>, 'specify'> & {
+    specify?: ParamSpec<D, K, R, I>['specify'];
+  }
+): ParamSpec<D, K, R, I> {
+  return {
+    ...entry,
+    specify: entry.specify ?? specifyUsingOpenRouter,
+  } as ParamSpec<D, K, R, I>;
 }
 
 function initParam<
-  A extends Record<K, Parameter<A[K]>>,
-  K extends keyof A,
-  >(_key: K): Parameter<A[K]> {
+  D extends Record<string, SomeParameterType>,
+  K extends keyof D,
+  >(_key: K): Parameter<D[K]> {
     return {
       state: { tag: 'empty' },
       options: { tag: 'unknown' }
     };
 }
 
-export async function initParams<A extends Record<string, Parameter<any>>>(
-  spec: Flow<A>
-): Promise<A> {
+export async function initParams<D extends Record<string, SomeParameterType>>(
+  spec: Flow<D>
+): Promise<Parameterized<D>> {
   // Synchronously initialize all params using lodash
   let params = _.mapValues(spec, (_specEntry, keyString) => {
-    const key = keyString as keyof A;
-    return initParam<A, typeof key>(key);
-  }) as A;
+    const key = keyString as keyof D;
+    return initParam<D, typeof key>(key);
+  }) as Parameterized<D>;
 
-  for (const key of Object.keys(spec) as Array<keyof A>) {
+  for (const key of Object.keys(spec) as Array<keyof D>) {
     if (spec[key].requires.length === 0) {
       const variants = await spec[key].fetchOptions({} as any);
       params = {
@@ -74,28 +73,28 @@ export async function initParams<A extends Record<string, Parameter<any>>>(
   return params;
 }
 
-type FlowStep<A extends Record<string, Parameter<any>>> = {
+type FlowStep<D extends Record<string, SomeParameterType>> = {
   type: 'done',
-  params: A,
+  params: Parameterized<D>,
 } | {
   type: 'refuse-empty-options',
-  key: keyof A,
+  key: keyof D,
 } | {
   type: 'need-specify',
-  key: keyof A,
+  key: keyof D,
   userValue: string,
   options: OptionChoice<unknown>[]
 } | {
   type: 'need-fetch-for-update',
-  key: keyof A,
+  key: keyof D,
   filters: Record<string, unknown>
 } | {
   type: 'need-fetch-for-ask',
-  key: keyof A,
+  key: keyof D,
   filters: Record<string, unknown>
 }
 
-export function nextFlowStep<A extends Record<string, Parameter<any>>>(spec: Flow<A>, params: A): FlowStep<A> | null {
+export function nextFlowStep<D extends Record<string, SomeParameterType>>(spec: Flow<D>, params: Parameterized<D>): FlowStep<D> | null {
   console.log('nextFlowStep', params);
   if (areAllParametersSpecified(params)) {
     return { type: 'done', params };
@@ -103,9 +102,9 @@ export function nextFlowStep<A extends Record<string, Parameter<any>>>(spec: Flo
   
   // find parameters to work with
   // TODO: add priorities
-  for (const key of Object.keys(spec) as Array<keyof A>) {
+  for (const key of Object.keys(spec) as Array<keyof D>) {
     const param = params[key];
-    const step: FlowStep<A> | null = match([param.state, param.options] as const)
+    const step: FlowStep<D> | null = match([param.state, param.options] as const)
       .with([{ tag: "provided" }, { tag: "available", variants: [] }], () => {
         // TODO: consider moving this check close to options fetching logic
         return { type: 'refuse-empty-options' as const, key };
@@ -153,12 +152,12 @@ export function nextFlowStep<A extends Record<string, Parameter<any>>>(spec: Flo
   throw new Error('Exhausted all parameters, but haven\'t reached done state');
 }
 
-async function advanceFlow<T extends Record<string, Parameter<any>>>(
-  spec: Flow<T>,
-  params: T,
-  step: Exclude<FlowStep<T>, { type: 'done' }>,
+async function advanceFlow<D extends Record<string, SomeParameterType>>(
+  spec: Flow<D>,
+  params: Parameterized<D>,
+  step: Exclude<FlowStep<D>, { type: 'done' }>,
   askUser: (question: string) => Promise<string>
-): Promise<T> {
+): Promise<Parameterized<D>> {
   const key = step.key;
   const param = { ...params[key] };
 
@@ -167,14 +166,14 @@ async function advanceFlow<T extends Record<string, Parameter<any>>>(
     const optionChoice = await paramSpec.specify(step.userValue, step.options as any);
     param.state = {
       tag: 'specified',
-      value: optionChoice.value
+      value: optionChoice.value as D[typeof key]
     };
   } else if (step.type === 'need-fetch-for-update') {
     const paramSpec = spec[key];
     const options = await paramSpec.fetchOptions(step.filters as any);
     param.options = {
       tag: 'available',
-      variants: options
+      variants: options as OptionChoice<D[typeof key]>[]
     };
   } else if (step.type === 'need-fetch-for-ask') {
     const paramSpec = spec[key];
@@ -185,7 +184,7 @@ async function advanceFlow<T extends Record<string, Parameter<any>>>(
     const optionChoice = await paramSpec.specify(userAnswer, options);
     param.state = {
       tag: 'specified',
-      value: optionChoice.value
+      value: optionChoice.value as D[typeof key]
     };
   } else if (step.type === 'refuse-empty-options') {
     // TODO: recursively clear specified values until we find a parameter that has available options
@@ -196,16 +195,16 @@ async function advanceFlow<T extends Record<string, Parameter<any>>>(
   return { ...params, [key]: param };
 }
 
-export async function runFlow<T extends Record<string, Parameter<any>>>(
-  spec: Flow<T>,
+export async function runFlow<D extends Record<string, SomeParameterType>>(
+  spec: Flow<D>,
   askUser: (question: string) => Promise<string>
-): Promise<T> {
+): Promise<Parameterized<D>> {
   const cycles = detectRequiresCycles(spec);
   if (cycles.length) {
     throw new Error(`Your spec contains a cycle: ${cycles[0].join(' -> ')}`);
   }
 
-  let params: T = await initParams(spec);
+  let params: Parameterized<D> = await initParams(spec);
   log('initialParams', params);
 
   while (true) {

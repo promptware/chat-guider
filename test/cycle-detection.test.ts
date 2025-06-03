@@ -1,33 +1,33 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import { detectRequiresCycles, parameter } from '../src/index.js';
-import type { Flow, Parameter, OptionChoice } from '../src/index.js';
+import type { Flow, OptionChoice } from '../src/index.js';
 
 describe('Cycle Detection', () => {
   describe('detectRequiresCycles', () => {
     it('should return empty array for acyclic spec', () => {
       type TestParams = {
-        a: Parameter<string>;
-        b: Parameter<string>;
-        c: Parameter<string>;
+        a: string;
+        b: string;
+        c: string;
       };
 
       const acyclicSpec: Flow<TestParams> = {
-        a: parameter("a", {
+        a: parameter<TestParams, "a", [], []>("a", {
           description: "Parameter A",
           requires: [],
           influencedBy: [],
           fetchOptions: async () => [{ value: 'a', id: 'a' }],
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
-        b: parameter("b", {
+        b: parameter<TestParams, "b", ["a"], []>("b", {
           description: "Parameter B", 
           requires: ['a'],
           influencedBy: [],
           fetchOptions: async (filters: { a: string }) => [{ value: 'b', id: 'b' }],
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
-        c: parameter("c", {
+        c: parameter<TestParams, "c", ["a", "b"], []>("c", {
           description: "Parameter C",
           requires: ['a', 'b'],
           influencedBy: [],
@@ -42,19 +42,19 @@ describe('Cycle Detection', () => {
 
     it('should detect simple 2-node cycle', () => {
       type TestParams = {
-        a: Parameter<string>;
-        b: Parameter<string>;
+        a: string;
+        b: string;
       };
 
       const cyclicSpec: Flow<TestParams> = {
-        a: parameter("a", {
+        a: parameter<TestParams, "a", ["b"], []>("a", {
           description: "Parameter A",
           requires: ['b'],
           influencedBy: [],
           fetchOptions: async (filters: { b: string }) => [{ value: 'a', id: 'a' }],
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
-        b: parameter("b", {
+        b: parameter<TestParams, "b", ["a"], []>("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
@@ -70,27 +70,27 @@ describe('Cycle Detection', () => {
 
     it('should detect 3-node cycle', () => {
       type TestParams = {
-        a: Parameter<string>;
-        b: Parameter<string>;
-        c: Parameter<string>;
+        a: string;
+        b: string;
+        c: string;
       };
 
       const cyclicSpec: Flow<TestParams> = {
-        a: parameter("a", {
+        a: parameter<TestParams, "a", ["c"], []>("a", {
           description: "Parameter A",
           requires: ['c'],
           influencedBy: [],
           fetchOptions: async (filters: { c: string }) => [{ value: 'a', id: 'a' }],
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
-        b: parameter("b", {
+        b: parameter<TestParams, "b", ["a"], []>("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
           fetchOptions: async (filters: { a: string }) => [{ value: 'b', id: 'b' }],
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
-        c: parameter("c", {
+        c: parameter<TestParams, "c", ["b"], []>("c", {
           description: "Parameter C",
           requires: ['b'],
           influencedBy: [],
@@ -106,22 +106,22 @@ describe('Cycle Detection', () => {
 
     it('should detect multiple separate cycles', () => {
       type TestParams = {
-        a: Parameter<string>;
-        b: Parameter<string>;
-        c: Parameter<string>;
-        d: Parameter<string>;
+        a: string;
+        b: string;
+        c: string;
+        d: string;
       };
 
       const multipleCyclesSpec: Flow<TestParams> = {
         // First cycle: a -> b -> a
-        a: parameter("a", {
+        a: parameter<TestParams, "a", ["b"], []>("a", {
           description: "Parameter A",
           requires: ['b'],
           influencedBy: [],
           fetchOptions: async (filters: { b: string }) => [{ value: 'a', id: 'a' }],
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
-        b: parameter("b", {
+        b: parameter<TestParams, "b", ["a"], []>("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
@@ -129,14 +129,14 @@ describe('Cycle Detection', () => {
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         // Second cycle: c -> d -> c
-        c: parameter("c", {
+        c: parameter<TestParams, "c", ["d"], []>("c", {
           description: "Parameter C",
           requires: ['d'],
           influencedBy: [],
           fetchOptions: async (filters: { d: string }) => [{ value: 'c', id: 'c' }],
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
-        d: parameter("d", {
+        d: parameter<TestParams, "d", ["c"], []>("d", {
           description: "Parameter D",
           requires: ['c'],
           influencedBy: [],
@@ -158,15 +158,15 @@ describe('Cycle Detection', () => {
 
     it('should handle complex graph with mixed cycles and acyclic parts', () => {
       type TestParams = {
-        root: Parameter<string>;
-        a: Parameter<string>;
-        b: Parameter<string>;
-        c: Parameter<string>;
-        leaf: Parameter<string>;
+        root: string;
+        a: string;
+        b: string;
+        c: string;
+        leaf: string;
       };
 
       const complexSpec: Flow<TestParams> = {
-        root: parameter("root", {
+        root: parameter<TestParams, "root", [], []>("root", {
           description: "Root parameter",
           requires: [],
           influencedBy: [],
@@ -174,28 +174,28 @@ describe('Cycle Detection', () => {
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
         // Cycle: a -> b -> c -> a
-        a: parameter("a", {
+        a: parameter<TestParams, "a", ["root", "c"], []>("a", {
           description: "Parameter A",
           requires: ['root', 'c'], // depends on root (acyclic) and c (cyclic)
           influencedBy: [],
           fetchOptions: async (filters: { root: string; c: string }) => [{ value: 'a', id: 'a' }],
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
-        b: parameter("b", {
+        b: parameter<TestParams, "b", ["a"], []>("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
           fetchOptions: async (filters: { a: string }) => [{ value: 'b', id: 'b' }],
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
-        c: parameter("c", {
+        c: parameter<TestParams, "c", ["b"], []>("c", {
           description: "Parameter C",
           requires: ['b'],
           influencedBy: [],
           fetchOptions: async (filters: { b: string }) => [{ value: 'c', id: 'c' }],
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
-        leaf: parameter("leaf", {
+        leaf: parameter<TestParams, "leaf", ["root"], []>("leaf", {
           description: "Leaf parameter",
           requires: ['root'],
           influencedBy: [],
@@ -217,11 +217,11 @@ describe('Cycle Detection', () => {
 
     it('should handle single node with no dependencies', () => {
       type TestParams = {
-        a: Parameter<string>;
+        a: string;
       };
 
       const singleNodeSpec: Flow<TestParams> = {
-        a: parameter("a", {
+        a: parameter<TestParams, "a", [], []>("a", {
           description: "Parameter A",
           requires: [],
           influencedBy: [],
@@ -236,12 +236,12 @@ describe('Cycle Detection', () => {
 
     it('should detect cycle in a larger DAG with one cycle', () => {
       type TestParams = {
-        a: Parameter<string>;
-        b: Parameter<string>;
-        c: Parameter<string>;
-        d: Parameter<string>;
-        e: Parameter<string>;
-        f: Parameter<string>;
+        a: string;
+        b: string;
+        c: string;
+        d: string;
+        e: string;
+        f: string;
       };
 
       // Structure: a -> b -> c -> d -> e -> f
@@ -249,42 +249,42 @@ describe('Cycle Detection', () => {
       //                      +---------+
       // So there's a cycle: c -> d -> e -> c, while a -> b is acyclic
       const complexDAGSpec: Flow<TestParams> = {
-        a: parameter("a", {
+        a: parameter<TestParams, "a", [], []>("a", {
           description: "Parameter A",
           requires: [],
           influencedBy: [],
           fetchOptions: async () => [{ value: 'a', id: 'a' }],
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
-        b: parameter("b", {
+        b: parameter<TestParams, "b", ["a"], []>("b", {
           description: "Parameter B",
           requires: ['a'],
           influencedBy: [],
           fetchOptions: async (filters: { a: string }) => [{ value: 'b', id: 'b' }],
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
-        c: parameter("c", {
+        c: parameter<TestParams, "c", ["b", "e"], []>("c", {
           description: "Parameter C",
           requires: ['b', 'e'], // Creates cycle with e
           influencedBy: [],
           fetchOptions: async (filters: { b: string; e: string }) => [{ value: 'c', id: 'c' }],
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
-        d: parameter("d", {
+        d: parameter<TestParams, "d", ["c"], []>("d", {
           description: "Parameter D",
           requires: ['c'],
           influencedBy: [],
           fetchOptions: async (filters: { c: string }) => [{ value: 'd', id: 'd' }],
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
-        e: parameter("e", {
+        e: parameter<TestParams, "e", ["d"], []>("e", {
           description: "Parameter E",
           requires: ['d'],
           influencedBy: [],
           fetchOptions: async (filters: { d: string }) => [{ value: 'e', id: 'e' }],
           specify: async (value: string, options: OptionChoice<string>[]) => options[0]
         }),
-        f: parameter("f", {
+        f: parameter<TestParams, "f", ["e"], []>("f", {
           description: "Parameter F",
           requires: ['e'],
           influencedBy: [],

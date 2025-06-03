@@ -1,30 +1,33 @@
-import type { Flow, Parameter, ParameterValues } from "./types";
+import type {
+  Flow,
+  ParameterValues,
+  Parameterized,
+  SomeParameterType,
+} from "./types";
 
 export const FlowSpecSymbol = Symbol("FlowSpec");
 
 /**
- * Decorator factory for methods that are part of an agent's flow.
- * It type-checks that the decorated method's first parameter expects an unwrapped version
- * of the parameters defined by the flow specification.
- * The actual unwrapping and calling will be handled by the agent's execution logic.
- *
- * @param spec The flow specification, conforming to Flow<P>.
+ * Method decorator: attaches flow specification metadata to a class method.
+ * D – plain domain params record written by the user.
  */
-export function flow<P extends Record<string, Parameter<any>>>(spec: Flow<P>) {
+export function flow<D extends Record<string, SomeParameterType>>(spec: Flow<D>) {
   return function (
-    originalMethod: (params: ParameterValues<P>, ...restArgs: any[]) => any,
-    context: ClassMethodDecoratorContext
-  ): ((params: ParameterValues<P>, ...restArgs: any[]) => any) | void {
+    originalMethod: (params: ParameterValues<Parameterized<D>>, ...restArgs: any[]) => any,
+    context: ClassMethodDecoratorContext,
+  ): ((params: ParameterValues<Parameterized<D>>, ...restArgs: any[]) => any) | void {
     if (context.kind !== "method") {
-      console.error(`Flow decorator can only be applied to methods. Context kind: ${context.kind} on ${String(context.name)}`);
+      console.error(`@flow can only be applied to methods; got ${context.kind} on ${String(context.name)}`);
       return;
     }
-    if (typeof originalMethod !== 'function') {
-      console.error(`Flow decorator applied to '${String(context.name)}', which is not a function.`);
+    if (typeof originalMethod !== "function") {
+      console.error(`@flow applied to '${String(context.name)}' which is not a function.`);
       return;
     }
+
+    // attach metadata
     Object.defineProperty(originalMethod, FlowSpecSymbol, {
-      value: { spec: spec, originalUserMethod: originalMethod },
+      value: { spec, originalUserMethod: originalMethod },
       writable: false,
       enumerable: false,
       configurable: false,
@@ -34,50 +37,40 @@ export function flow<P extends Record<string, Parameter<any>>>(spec: Flow<P>) {
 }
 
 /**
- * Base class for agents, providing common structure and a run method.
- * Subclasses MUST implement `getName` and `getDescription` methods, which should return Promises.
+ * Base class for Agents.
  */
 export abstract class AgentBase {
   abstract getName(): Promise<string>;
   abstract getDescription(): Promise<string>;
 
   public async run(): Promise<void> {
-    const agentName = await this.getName();
-    const agentDescription = await this.getDescription();
+    const name = await this.getName();
+    const description = await this.getDescription();
 
-    console.log(`Running agent: ${agentName}`);
-    console.log(`Description: ${agentDescription}`);
+    console.log(`Running agent: ${name}`);
+    console.log(`Description: ${description}`);
     console.log("Available flows:");
 
-    const loggedFlowNames = new Set<string>();
-    let currentPrototype = Object.getPrototypeOf(this);
+    const logged = new Set<string>();
+    let proto: any = Object.getPrototypeOf(this);
 
-    // Walk up the prototype chain until Object.prototype or null
-    while (currentPrototype && currentPrototype !== Object.prototype) {
-      for (const propertyName of Object.getOwnPropertyNames(currentPrototype)) {
-        // Exclude constructor and methods from AgentBase itself if we only want flows from subclasses
-        // For this iteration, we will log any flow method found on any prototype up to AgentBase.
-        if (propertyName === 'constructor') {
-          continue;
-        }
-
+    while (proto && proto !== Object.prototype) {
+      for (const key of Object.getOwnPropertyNames(proto)) {
+        if (key === "constructor") continue;
         try {
-          // Access the property value via the instance, which will resolve to the prototype method.
-          const propertyValue = (this as any)[propertyName];
-          
-          if (Object.prototype.hasOwnProperty.call(propertyValue, FlowSpecSymbol)) {
-            if (!loggedFlowNames.has(propertyName)) {
-              console.log(`- ${propertyName}`);
-              loggedFlowNames.add(propertyName);
+          const value = (this as any)[key];
+          if (Object.prototype.hasOwnProperty.call(value, FlowSpecSymbol)) {
+            if (!logged.has(key)) {
+              console.log(`- ${key}`);
+              logged.add(key);
             }
           }
         } catch (e) {
-          // It's good to get a bit more context for the warning if possible.
-          const protoConstructorName = currentPrototype.constructor ? currentPrototype.constructor.name : 'UnknownPrototype';
-          console.warn(`Could not inspect property '${propertyName}' on prototype '${protoConstructorName}'. Error: ${e}`);
+          const protoName = proto.constructor ? proto.constructor.name : "<anon>";
+          console.warn(`Could not inspect '${key}' on prototype '${protoName}':`, e);
         }
       }
-      currentPrototype = Object.getPrototypeOf(currentPrototype);
+      proto = Object.getPrototypeOf(proto);
     }
   }
 }

@@ -20,44 +20,59 @@ export type Parameter<A> = {
 export type LiteralKeys<T extends (string | number | symbol)[]> = T[number];
 
 export type FetchOptionsParams<
-  A,
-  R extends keyof A,
-  I extends keyof A
+  D extends Record<string, SomeParameterType>,
+  R extends keyof D,
+  I extends keyof D
 > = {
-  [P in R]-?: A[P] extends Parameter<infer U> ? U : never;
+  [P in R]-?: D[P];
 } & {
-  [P in I]?: A[P] extends Parameter<infer U> ? U : never;
+  [P in I]?: D[P];
 };
 
 export type ParamSpec<
-  A,
-  K extends keyof A,
-  R extends (Exclude<keyof A, K>)[],
-  I extends (Exclude<keyof A, K>)[],
-  T = A[K] extends Parameter<infer U> ? U : never
+  D extends Record<string, SomeParameterType>,
+  K extends keyof D,
+  R extends (Exclude<keyof D, K>)[],
+  I extends (Exclude<keyof D, K>)[]
 > = {
   requires: R;
   description: string;
   influencedBy: I;
   fetchOptions: (
-    params: FetchOptionsParams<A, LiteralKeys<R>, LiteralKeys<I>>
-  ) => Promise<OptionChoice<T>[]>;
+    params: FetchOptionsParams<D, LiteralKeys<R>, LiteralKeys<I>>
+  ) => Promise<OptionChoice<D[K]>[]>;
   specify: (
     value: string,
-    options: OptionChoice<T>[]
-  ) => Promise<OptionChoice<T>>;
+    options: OptionChoice<D[K]>[]
+  ) => Promise<OptionChoice<D[K]>>;
 };
 
-export type Flow<A extends Record<string, Parameter<any>>> = {
-  [K in keyof A]-?: ParamSpec<A, K, Exclude<keyof A, K>[], Exclude<keyof A, K>[]>
-}
-
-/**
- * Utility type to transform a record of Parameter<T> types into a record of T types.
- * For example, { foo: Parameter<string>, bar: Parameter<number> } becomes { foo: string, bar: number }.
- */
 export type ParameterValues<ParamRecord extends Record<string, Parameter<any>>> = {
   [K in keyof ParamRecord]: ParamRecord[K] extends Parameter<infer ValueType>
     ? ValueType
     : never;
+};
+
+// A helper alias for the primitive/value types a Parameter can wrap.
+export type SomeParameterType = unknown;
+
+/**
+ * Wrap every property of a plain record into a Parameter<T> wrapper.
+ *   { foo: string; bar: number } -> { foo: Parameter<string>; bar: Parameter<number> }
+ */
+export type Parameterized<R extends Record<string, SomeParameterType>> = {
+  [K in keyof R]: Parameter<R[K]>;
+};
+
+/**
+ * Users write `Flow<DomainParams>` where DomainParams is a plain record of values.
+ * Internally we use Parameterized<DomainParams>.
+ */
+export type Flow<D extends Record<string, SomeParameterType>> = {
+  [K in keyof D]-?: ParamSpec<
+    D,
+    K,
+    Exclude<keyof D, K>[],
+    Exclude<keyof D, K>[]
+  >;
 };

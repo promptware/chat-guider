@@ -1,14 +1,14 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import { initParams, nextFlowStep, parameter } from '../src/index.js';
-import type { Flow, Parameter, OptionChoice } from '../src/index.js';
+import type { Flow, OptionChoice } from '../src/index.js';
 
 describe('nextFlowStep', () => {
   describe('returns type: "done"', () => {
     it('should return done when all parameters are specified', async () => {
       type TestParams = {
-        a: Parameter<string>;
-        b: Parameter<string>;
+        a: string;
+        b: string;
       };
 
       const spec: Flow<TestParams> = {
@@ -43,7 +43,7 @@ describe('nextFlowStep', () => {
   describe('returns type: "need-fetch-for-ask"', () => {
     it('should return need-fetch-for-ask for parameter with empty state and no dependencies', async () => {
       type TestParams = {
-        a: Parameter<string>;
+        a: string;
       };
 
       const spec: Flow<TestParams> = {
@@ -70,8 +70,8 @@ describe('nextFlowStep', () => {
 
     it('should return need-fetch-for-ask for parameter with empty state when dependencies are specified', async () => {
       type TestParams = {
-        a: Parameter<string>;
-        b: Parameter<string>;
+        a: string;
+        b: string;
       };
 
       const spec: Flow<TestParams> = {
@@ -109,7 +109,7 @@ describe('nextFlowStep', () => {
   describe('returns type: "need-specify"', () => {
     it('should return need-specify when parameter has provided state and available options', async () => {
       type TestParams = {
-        a: Parameter<string>;
+        a: string;
       };
 
       const spec: Flow<TestParams> = {
@@ -152,8 +152,8 @@ describe('nextFlowStep', () => {
   describe('returns type: "need-fetch-for-update"', () => {
     it('should return need-fetch-for-update when parameter has provided state and unknown options with satisfied dependencies', async () => {
       type TestParams = {
-        a: Parameter<string>;
-        b: Parameter<string>;
+        a: string;
+        b: string;
       };
 
       const spec: Flow<TestParams> = {
@@ -194,7 +194,7 @@ describe('nextFlowStep', () => {
   describe('returns type: "refuse-empty-options"', () => {
     it('should return refuse-empty-options when parameter has provided state but empty options', async () => {
       type TestParams = {
-        a: Parameter<string>;
+        a: string;
       };
 
       const spec: Flow<TestParams> = {
@@ -223,8 +223,8 @@ describe('nextFlowStep', () => {
   describe('returns null', () => {
     it('should return null when parameter has provided state but dependencies not satisfied', async () => {
       type TestParams = {
-        a: Parameter<string>;
-        b: Parameter<string>;
+        a: string;
+        b: string;
       };
 
       const spec: Flow<TestParams> = {
@@ -261,9 +261,9 @@ describe('nextFlowStep', () => {
 
     it('should return null when all parameters are either specified or have unsatisfied dependencies', async () => {
       type TestParams = {
-        a: Parameter<string>;
-        b: Parameter<string>;
-        c: Parameter<string>;
+        a: string;
+        b: string;
+        c: string;
       };
 
       const spec: Flow<TestParams> = {
@@ -307,9 +307,9 @@ describe('nextFlowStep', () => {
 
     it('should return null for all iterations after processing available actions', async () => {
       type TestParams = {
-        a: Parameter<string>;
-        b: Parameter<string>;
-        c: Parameter<string>;
+        a: string;
+        b: string;
+        c: string;
       };
 
       const spec: Flow<TestParams> = {
@@ -352,8 +352,8 @@ describe('nextFlowStep', () => {
 
     it('should return null when parameter with empty state has unsatisfied dependencies', async () => {
       type TestParams = {
-        a: Parameter<string>;
-        b: Parameter<string>;
+        a: string;
+        b: string;
       };
 
       const spec: Flow<TestParams> = {

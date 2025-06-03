@@ -1,15 +1,14 @@
-import { Flow, Parameter, ParameterValues } from "../src/types";
+import { Flow } from "../src/types";
 import { parameter } from "../src/runtime";
 import { AgentBase, flow } from "../src/agent";
 import _ from 'lodash';
 
 type Params = {
-  departure: Parameter<string>;
-  arrival: Parameter<string>;
-  date: Parameter<string>;
-  passengers: Parameter<number>;
+  departure: string;
+  arrival: string;
+  date: string;
+  passengers: number;
 };
-
 
 const entries = [
   { departure: "London", arrival: "New York", date: "2026-10-01", seats: 100 },
@@ -98,7 +97,7 @@ class TouristAgencyAgent extends AgentBase {
   }
 
   @flow(bookFlightSpec)
-  public bookFlight ({arrival, departure, date, passengers}: ParameterValues<Params>) {
+  public bookFlight ({arrival, departure, date, passengers}: Params) {
     console.log('bookFlight', arrival, departure, date, passengers);
   }
 }
