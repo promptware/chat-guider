@@ -12,20 +12,6 @@ type Tool<InputSchema extends z.ZodTypeAny, OutputSchema extends z.ZodTypeAny> =
 
 };
 
-
-type FlexibleSchema<T> = z.ZodType<T>;
-
-const schema = z.object({
-  feedback: z.string().min(1),
-});
-
-const looseSchema = z.object({
-  feedback: z.string().optional(),
-});
-
-type LooseValue = z.infer<typeof looseSchema>;
-type Value = z.infer<typeof schema>;
-
 export type ToolzyFeedback<Value> = {
   tag: 'rejected',
   reasons: { field: string; allowedOptions?: string[]; refusalReason?: string }[];
@@ -33,13 +19,6 @@ export type ToolzyFeedback<Value> = {
   tag: 'accepted',
   value: Value;
 }
-
-type ToolzyHandle<LooseType, State, Value> = {
-  reject: (reason: string) => Promise<void>;
-  accept: (value: Value) => Promise<void>;
-  getState: () => Promise<State>;
-};
-
 
 type ToolParams<LooseSchema extends z.ZodTypeAny, State, InputSchema extends z.ZodTypeAny, OutputSchema extends z.ZodTypeAny> = {
   inputSchema: InputSchema;
@@ -75,52 +54,3 @@ export function mkTool<LooseSchema extends z.ZodTypeAny, State, InputSchema exte
   const toolFn = tool as unknown as <T>(args: T) => T;
   return toolFn(cns);
 };
-
-// const options = await toolParams.fetchState(input);
-// return await match(await toolParams.fixup(input, {
-//   reject: async (reason) => { return { rejected: reason } },
-//   accept: async (value) => { return value },
-//   getState: async () => nullState,
-// }))
-//   .with({ rejected: P.string }, (value) => { return { rejected: value.rejected } })
-//   .with({ accepted: P.any }, (value) => {
-//     const result = await toolParams.execute(value, options);
-//     return result;
-//   })
-//   .exhaustive();
-
-
-const myTool = mkTool({
-  inputSchema: schema,
-  outputSchema: z.object({ ok: z.boolean() }),
-  execute: async (input: Value, options: unknown): Promise<{ ok: boolean }> => {
-    console.log('execute', input, options);
-    return {
-      ok: true,
-    };
-  },
-  looseSchema, 
-  fetchState: async () => {
-    return {
-    };
-  },
-  fixup: async (loozeValue: LooseValue): Promise<ToolzyFeedback<Value>> => {
-    if (typeof loozeValue.feedback === 'string') {
-      return {
-        tag: 'accepted',
-        value: { feedback: loozeValue.feedback }
-      };
-    }
-    return {
-      tag: 'rejected',
-      reasons: [{ field: 'feedback', allowedOptions: [] }]
-    };
-  },
-});
-
-// export function getFeedback(params: Parameterized<D>) {
-//   const feedback = await client.generateObject({
-//     prompt: `Please provide feedback on the following parameters: ${JSON.stringify(params)}`,
-//     schema,
-//   });
-// }
