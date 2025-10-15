@@ -86,9 +86,9 @@ describe('validation.compileFixup', () => {
       tag: 'rejected' as const,
       reasons: [
         { field: 'departure', allowedOptions: ['London','Berlin','Paris','New York'] },
-        { field: 'arrival', allowedOptions: [] },
-        { field: 'date', allowedOptions: [] },
-        { field: 'passengers', allowedOptions: [] },
+        { field: 'arrival', refusalReason: 'no options' },
+        { field: 'date', refusalReason: 'no options' },
+        { field: 'passengers', refusalReason: 'no options' },
       ],
       options: {
         departure: ['London','Berlin','Paris','New York'],
@@ -108,8 +108,8 @@ describe('validation.compileFixup', () => {
       reasons: [
         { field: 'departure', allowedOptions: ['Paris'] },
         { field: 'arrival', allowedOptions: ['New York'] },
-        { field: 'date', allowedOptions: [] },
-        { field: 'passengers', allowedOptions: [] },
+        { field: 'date', refusalReason: 'no options' },
+        { field: 'passengers', refusalReason: 'no options' },
       ],
       options: {
         departure: ['Paris'],
@@ -128,7 +128,7 @@ describe('validation.compileFixup', () => {
       tag: 'rejected' as const,
       reasons: [
         { field: 'date', allowedOptions: ['2026-10-01'] },
-        { field: 'passengers', allowedOptions: ['1'] },
+        { field: 'passengers', allowedOptions: [1] },
       ],
       options: {
         departure: ['London','Berlin'],
@@ -163,8 +163,8 @@ describe('validation.compileFixup', () => {
       tag: 'rejected' as const,
       reasons: [
         { field: 'arrival', allowedOptions: ['Tokyo'] },
-        { field: 'date', allowedOptions: [] },
-        { field: 'passengers', refusalReason: 'requested passengers exceed available seats', allowedOptions: [] },
+        { field: 'date', refusalReason: 'no options' },
+        { field: 'passengers', refusalReason: 'no options' },
       ],
       options: {
         departure: ['London','Berlin','Paris','New York'],

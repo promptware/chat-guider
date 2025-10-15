@@ -1,24 +1,24 @@
 import { detectRequiresCycles } from './graph.js';
 
-export type FeedbackReason<K extends string = string> = {
-  field: K;
-  allowedOptions?: string[];
+export type FeedbackReason<D extends Domain> = {
+  field: Extract<keyof D, string>;
+  allowedOptions?: D[Extract<keyof D, string>][];
   refusalReason?: string;
 };
 
-export type FixupAccepted<D> = {
+export type FixupAccepted<D extends Domain> = {
   tag: 'accepted';
   value: D;
   options: { [K in keyof D]: D[K][] };
 };
 
-export type FixupRejected<D> = {
+export type FixupRejected<D extends Domain> = {
   tag: 'rejected';
-  reasons: FeedbackReason<Extract<keyof D, string>>[];
+  reasons: FeedbackReason<D>[];
   options: { [K in keyof D]: D[K][] };
 };
 
-export type FixupOutcome<D> = FixupAccepted<D> | FixupRejected<D>;
+export type FixupOutcome<D extends Domain> = FixupAccepted<D> | FixupRejected<D>;
 
 export type Domain = Record<string, unknown>;
 
@@ -90,33 +90,40 @@ export function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
   async function fixup(loose: Partial<D>): Promise<FixupOutcome<D>> {
     const options = await computeOptions(loose);
     const normalized: Partial<D> = {};
-    const reasons: FeedbackReason<Extract<keyof D, string>>[] = [];
+    const reasons: FeedbackReason<D>[] = [];
 
-    for (const k of Object.keys(spec) as (keyof D)[]) {
+    const keys = Object.keys(spec) as Extract<keyof D, string>[];
+    for (const k of keys) {
       const rule = spec[k];
       const raw = loose[k];
 
+      // If there are no options for this field under current filters, reject immediately
+      if (options[k].length === 0) {
+        reasons.push({ field: k, refusalReason: 'no options' });
+        continue;
+      }
+
       if (raw === undefined) {
-        reasons.push({ field: k as Extract<keyof D, string>, allowedOptions: options[k].map(v => String(v as any)) });
+        reasons.push({ field: k, allowedOptions: options[k] });
         continue;
       }
 
       const norm = rule.normalize ? rule.normalize(raw) : (raw as D[typeof k]);
       if (norm === undefined) {
-        reasons.push({ field: k as Extract<keyof D, string>, refusalReason: 'failed to normalize input', allowedOptions: options[k].map(v => String(v as any)) });
+        reasons.push({ field: k, refusalReason: 'failed to normalize input', allowedOptions: options[k] });
         continue;
       }
 
       const hasOptions = options[k].length > 0;
       const isAllowed = hasOptions ? options[k].some(v => Object.is(v, norm)) : true;
       if (!isAllowed) {
-        reasons.push({ field: k as Extract<keyof D, string>, allowedOptions: options[k].map(v => String(v as any)) });
+        reasons.push({ field: k, allowedOptions: options[k] });
         continue;
       }
 
       const refusal = rule.validate?.(norm, { optionsForField: options[k], wholeInput: loose });
       if (refusal) {
-        reasons.push({ field: k as Extract<keyof D, string>, refusalReason: refusal, allowedOptions: options[k].map(v => String(v as any)) });
+        reasons.push({ field: k, refusalReason: refusal, allowedOptions: options[k] });
         continue;
       }
 
