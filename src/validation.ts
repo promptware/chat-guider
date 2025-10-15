@@ -20,6 +20,14 @@ export type FixupOutcome<D extends Domain> = FixupAccepted<D> | FixupRejected<D>
 
 export type Domain = Record<string, unknown>;
 
+// All good, normalized the value
+export type ValidationOk<T> = { isValid: true; normalizedValue: T; };
+// Error with refusal reason + allowed options
+export type ValidationErr<T> = { isValid: false; refusalReason: string, allowedOptions?: T[] };
+// If the value was not provided, we can just show allowed options that depend on context
+export type ValidationSkip<T> = { allowedOptions?: T[] };
+export type ValidationResult<T> = ValidationOk<T> | ValidationErr<T> | ValidationSkip<T>;
+
 export type FieldRule<
   D extends Domain,
   K extends keyof D,
@@ -29,17 +37,10 @@ export type FieldRule<
   requires: Requires;
   influencedBy: Influences;
   description?: string;
-  fetchOptions: (
-    filters: Pick<D, Requires[number]> & Partial<Pick<D, Influences[number]>>
-  ) => Promise<D[K][]> | D[K][];
-  normalize?: (raw: unknown) => D[K] | undefined;
-  validate?: (
-    value: D[K],
-    context: {
-      optionsForField: D[K][];
-      wholeInput: Partial<D>;
-    }
-  ) => string | undefined;
+  validate: (
+    value: D[K] | undefined,
+    context: Pick<D, Requires[number]> & Partial<Pick<D, Influences[number]>>
+  ) => Promise<ValidationResult<D[K]>>;
 };
 
 export type ValidationSpec<D extends Domain> = {
@@ -55,8 +56,6 @@ export function defineValidationSpec<D extends Domain>() {
         requires: spec[key as keyof S].requires as string[],
         influencedBy: spec[key as keyof S].influencedBy as string[],
         description: spec[key as keyof S].description ?? '',
-        // placeholders for compatibility; not used by cycle detection
-        fetchOptions: () => [],
       };
     }
     const cycles = detectRequiresCycles(flowLike);
@@ -73,120 +72,91 @@ export function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
     return rule.requires.every((req) => provided[req] !== undefined);
   }
 
-  function makeFilters<K extends keyof D>(
-    rule: FieldRule<D, K>,
-    provided: Partial<D>,
-    validationResults?: { [K in keyof D]?: FieldFeedback<D, K> }
-  ): Partial<D> {
-    const filters: Partial<D> = {};
-    // requires are guaranteed valid by the caller if requiresReady
-    for (const req of rule.requires) {
-      if (provided[req] !== undefined) (filters as any)[req] = provided[req];
-    }
-    // include only influencedBy that are present and validated as valid
-    for (const inf of rule.influencedBy) {
-      const vr = validationResults ? (validationResults as any)[inf] : undefined;
-      if (provided[inf] !== undefined && vr && vr.valid === true) (filters as any)[inf] = provided[inf];
-    }
-    return filters;
-  }
+  // Local type aliases for cleaner types
+  type ValidationMap = { [P in keyof D]?: FieldFeedback<D, P> };
+  type ReqKeys<K extends keyof D> = FieldRule<D, K>['requires'][number];
+  type InfKeys<K extends keyof D> = FieldRule<D, K>['influencedBy'][number];
+  type ContextFor<K extends keyof D> = Pick<D, ReqKeys<K>> & Partial<Pick<D, InfKeys<K>>>;
 
-  async function fetchOptionsIfReady<K extends keyof D>(
+  async function validateIfReady<K extends keyof D>(
     key: K,
     rule: FieldRule<D, K>,
-    provided: Partial<D>,
-    validationResults?: { [K in keyof D]?: FieldFeedback<D, K> }
-  ): Promise<D[K][]> {
-    if (!haveAllRequires(rule, provided)) {
-      console.log('fixup:no-options:requires-missing', { field: String(key), requires: rule.requires });
-      return [];
+    normalized: Partial<D>,
+    validationResults: ValidationMap,
+    providedValue: D[K] | undefined
+  ): Promise<ValidationResult<D[K]>> {
+    if (!haveAllRequires(rule, normalized)) {
+      console.log('fixup:inactive:requires-missing', { field: String(key), requires: rule.requires });
+      return {} as ValidationResult<D[K]>;
     }
-    const filters = makeFilters(rule, provided, validationResults) as any;
-    console.log('fixup:fetchOptions', { field: String(key), filters });
-    return await rule.fetchOptions(filters);
+    // Build context using only valid influencedBy values
+    const entries: [string, unknown][] = [];
+    for (const req of rule.requires as (keyof D)[]) {
+      const v = normalized[req];
+      if (v !== undefined) entries.push([String(req), v]);
+    }
+    for (const inf of rule.influencedBy as (keyof D)[]) {
+      const vr = validationResults[inf];
+      const v = normalized[inf];
+      if (v !== undefined && vr && vr.valid === true) entries.push([String(inf), v]);
+    }
+    const context = Object.fromEntries(entries) as unknown as ContextFor<K>;
+    console.log('fixup:validate', { field: String(key), context });
+    const resp = await rule.validate(providedValue, context);
+    return resp as ValidationResult<D[K]>;
   }
 
   async function fixup(loose: Partial<D>): Promise<FixupOutcome<D>> {
     console.log('fixup:start', loose);
 
-    // 1) Normalize provided values only
     const normalized: Partial<D> = {};
     const keys = Object.keys(spec) as Extract<keyof D, string>[];
-    for (const k of keys) {
-      const rule = spec[k];
-      const raw = loose[k];
-      if (raw === undefined) continue;
-      const norm = rule.normalize ? rule.normalize(raw) : (raw as D[typeof k]);
-      if (norm === undefined) {
-        console.log('fixup:normalize-failed', { field: k, raw });
-        // keep absent; reason will be recorded below
-      } else {
-        normalized[k] = norm;
-      }
-    }
 
     // 2) Build per-field feedback according to requires and options
-    const validationResults = {} as { [K in keyof D]: FieldFeedback<D, K> };
+    const validationResults: ValidationMap = {};
 
     for (const k of keys) {
       const rule = spec[k];
-      const value = normalized[k];
       // A field is ready only if all requires are present AND previously validated as not invalid
       const requiresReady = (rule.requires as (keyof D)[]).every((dep) => {
         const present = normalized[dep] !== undefined;
-        const depVr = (validationResults as any)[dep];
+        const depVr = validationResults[dep];
         const isValid = depVr && depVr.valid === true;
         return present && isValid;
       });
 
       if (!requiresReady) {
         const missing: string[] = [];
-        for (const dep of rule.requires) {
-          const depKey = dep as unknown as string;
+        for (const dep of rule.requires as (keyof D)[]) {
+          const depKey = String(dep);
           const present = normalized[dep] !== undefined;
-          const depVr = (validationResults as any)[dep];
+          const depVr = validationResults[dep];
           const invalid = depVr && depVr.valid === false;
           if (!present || invalid) missing.push(depKey);
         }
         const msg = `requires a valid ${missing.join(', ')} first`;
         console.log('fixup:inactive-field', { field: k, missing });
-        (validationResults as any)[k] = { valid: false, refusalReason: msg };
+        (validationResults as ValidationMap)[k as keyof D] = { valid: false, refusalReason: msg } as FieldFeedback<D, any>;
         continue;
       }
 
-      const opts = await fetchOptionsIfReady(k as any, rule as any, normalized, validationResults as any);
-      if (opts.length === 0) {
-        console.log('fixup:no-matching-options', { field: k });
-        (validationResults as any)[k] = { valid: false, refusalReason: 'no matching options' };
-        continue;
+      const resp = await validateIfReady(k as keyof D, rule as FieldRule<D, keyof D>, normalized, validationResults, loose[k as keyof D] as D[keyof D] | undefined);
+      const allowed = ('allowedOptions' in resp ? resp.allowedOptions : undefined) as D[keyof D][] | undefined;
+      if ('isValid' in resp && resp.isValid === true) {
+        const norm = resp.normalizedValue as D[typeof k];
+        normalized[k as keyof D] = norm;
+        (validationResults as ValidationMap)[k as keyof D] = { valid: true, allowedOptions: allowed } as FieldFeedback<D, any>;
+      } else if ('isValid' in resp && resp.isValid === false) {
+        (validationResults as ValidationMap)[k as keyof D] = { valid: false, refusalReason: resp.refusalReason, allowedOptions: allowed } as FieldFeedback<D, any>;
+      } else {
+        // ValidationSkip: just allowedOptions for context without refusalReason
+        (validationResults as ValidationMap)[k as keyof D] = { valid: false, allowedOptions: allowed } as FieldFeedback<D, any>;
       }
-
-      if (value === undefined) {
-        console.log('fixup:missing-with-allowed', { field: k, allowedOptions: opts });
-        (validationResults as any)[k] = { valid: false, allowedOptions: opts as any };
-        continue;
-      }
-
-      const inOptions = opts.some(v => Object.is(v, value));
-      if (!inOptions) {
-        console.log('fixup:provided-not-in-options', { field: k, value, allowedOptions: opts });
-        (validationResults as any)[k] = { valid: false, refusalReason: 'no matching options', allowedOptions: opts as any };
-        continue;
-      }
-
-      const refusal = rule.validate?.(value as D[typeof k], { optionsForField: opts as any, wholeInput: normalized });
-      if (refusal) {
-        console.log('fixup:validate-refusal', { field: k, refusal });
-        (validationResults as any)[k] = { valid: false, refusalReason: 'no matching options', allowedOptions: opts as any };
-        continue;
-      }
-
-      (validationResults as any)[k] = { valid: true, allowedOptions: opts as any };
     }
 
     // 4) Decide outcome
-    const allValid = keys.every(k => (validationResults as any)[k].valid === true);
-    const allPresent = keys.every(k => normalized[k] !== undefined);
+    const allValid = keys.every(k => (validationResults as ValidationMap)[k as keyof D]?.valid === true);
+    const allPresent = keys.every(k => normalized[k as keyof D] !== undefined);
     if (!allValid || !allPresent) {
       const res = { tag: 'rejected', validationResults } as FixupRejected<D>;
       console.log('fixup:rejected', JSON.stringify(res, null, 2));

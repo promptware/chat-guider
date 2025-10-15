@@ -25,55 +25,54 @@ const spec = defineValidationSpec<Airline>()({
     requires: [],
     influencedBy: ['arrival'],
     description: 'City of departure',
-    fetchOptions: async (filters) => {
-      const filtered = entries.filter(e => (filters.arrival ? e.arrival === filters.arrival : true));
-      return uniq(filtered.map(e => e.departure));
+    validate: async (value: string | undefined, context: { arrival?: string }) => {
+      const filtered = entries.filter(e => (context.arrival ? e.arrival === context.arrival : true));
+      const allowed = uniq(filtered.map(e => e.departure));
+      const normalized = typeof value === 'string' ? value : undefined;
+      if (normalized === undefined) return { allowedOptions: allowed };
+      if (!allowed.some(v => Object.is(v, normalized))) return { allowedOptions: allowed, isValid: false, refusalReason: 'no matching options' };
+      return { allowedOptions: allowed, isValid: true, normalizedValue: normalized };
     }
   },
   arrival: {
     requires: ['departure'],
     influencedBy: ['date'],
     description: 'City of arrival',
-    fetchOptions: async (filters) => {
-      const filtered = entries.filter(e =>
-        e.departure === filters.departure &&
-        (filters.date ? e.date === filters.date : true)
-      );
-      return uniq(filtered.map(e => e.arrival));
+    validate: async (value: string | undefined, context: { departure: string; date?: string }) => {
+      const filtered = entries.filter(e => e.departure === context.departure && (context.date ? e.date === context.date : true));
+      const allowed = uniq(filtered.map(e => e.arrival));
+      const normalized = typeof value === 'string' ? value : undefined;
+      if (normalized === undefined) return { allowedOptions: allowed };
+      if (!allowed.some(v => Object.is(v, normalized))) return { allowedOptions: allowed, isValid: false, refusalReason: 'no matching options' };
+      return { allowedOptions: allowed, isValid: true, normalizedValue: normalized };
     }
   },
   date: {
     requires: ['departure', 'arrival'],
     influencedBy: ['passengers'],
     description: 'Date of departure',
-    fetchOptions: async (filters) => {
-      const filtered = entries.filter(e =>
-        e.departure === filters.departure &&
-        e.arrival === filters.arrival &&
-        (filters.passengers ? e.seats >= filters.passengers : true)
-      );
-      return uniq(filtered.map(e => e.date));
+    validate: async (value: string | undefined, context: { departure: string; arrival: string; passengers?: number }) => {
+      const filtered = entries.filter(e => e.departure === context.departure && e.arrival === context.arrival && (context.passengers ? e.seats >= context.passengers : true));
+      const allowed = uniq(filtered.map(e => e.date));
+      const normalized = typeof value === 'string' ? value : undefined;
+      if (normalized === undefined) return { allowedOptions: allowed };
+      if (!allowed.some(v => Object.is(v, normalized))) return { allowedOptions: allowed, isValid: false, refusalReason: 'no matching options' };
+      return { allowedOptions: allowed, isValid: true, normalizedValue: normalized };
     }
   },
   passengers: {
     requires: ['departure', 'arrival', 'date'],
     influencedBy: [],
     description: 'Number of passengers',
-    normalize: (raw) => {
-      const n = typeof raw === 'string' ? Number(raw) : raw;
-      return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined;
-    },
-    fetchOptions: async (filters) => {
-      const filtered = entries.filter(e =>
-        e.departure === filters.departure &&
-        e.arrival === filters.arrival &&
-        e.date === filters.date
-      );
-      return uniq(filtered.map(e => e.seats));
-    },
-    validate: (value, ctx) => {
-      const max = Math.max(0, ...ctx.optionsForField.map(o => Number(o)));
-      return value > max ? 'requested passengers exceed available seats' : undefined;
+    validate: async (value: number | undefined, context: { departure: string; arrival: string; date: string }) => {
+      const filtered = entries.filter(e => e.departure === context.departure && e.arrival === context.arrival && e.date === context.date);
+      const allowed = uniq(filtered.map(e => e.seats));
+      const rawNum = typeof value === 'string' ? Number(value) : value;
+      const normalized = typeof rawNum === 'number' && Number.isFinite(rawNum) && rawNum > 0 ? rawNum : undefined;
+      if (normalized === undefined) return { allowedOptions: allowed };
+      const max = Math.max(0, ...allowed.map(o => Number(o)));
+      if (normalized > max) return { allowedOptions: allowed, isValid: false, refusalReason: 'not enough seats' };
+      return { allowedOptions: allowed, isValid: true, normalizedValue: normalized };
     }
   }
 });
@@ -118,7 +117,7 @@ describe('validation.compileFixup', () => {
         departure: { valid: true, allowedOptions: ['London','Berlin','Paris','New York'] },
         arrival: { valid: true, allowedOptions: ['New York'] },
         date: { valid: true, allowedOptions: ['2026-10-01','2026-10-02'] },
-        passengers: { valid: false, refusalReason: 'no matching options', allowedOptions: [1] },
+        passengers: { valid: false, refusalReason: 'not enough seats', allowedOptions: [1] },
       },
     };
     expect(res).to.deep.equal(expected);

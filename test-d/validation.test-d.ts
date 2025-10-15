@@ -17,22 +17,22 @@ const validSpec = defineSpec()({
   departure: {
     requires: [],
     influencedBy: ['arrival'],
-    fetchOptions: async (filters: { arrival?: string }) => ['London','Berlin'],
+    validate: async (value: unknown, context: { arrival?: string }) => ({ allowedOptions: ['London','Berlin'], validation: { isValid: true, normalizedValue: 'London' } }),
   },
   arrival: {
     requires: ['departure'],
     influencedBy: ['date'],
-    fetchOptions: async (filters: { departure: string; date?: string }) => ['New York'],
+    validate: async (value: unknown, context: { departure: string; date?: string }) => ({ allowedOptions: ['New York'], validation: { isValid: true, normalizedValue: 'New York' } }),
   },
   date: {
     requires: ['departure','arrival'],
     influencedBy: ['passengers'],
-    fetchOptions: async (filters: { departure: string; arrival: string; passengers?: number }) => ['2026-10-01'],
+    validate: async (value: unknown, context: { departure: string; arrival: string; passengers?: number }) => ({ allowedOptions: ['2026-10-01'], validation: { isValid: true, normalizedValue: '2026-10-01' } }),
   },
   passengers: {
     requires: ['departure','arrival','date'],
     influencedBy: [],
-    fetchOptions: async (filters: { departure: string; arrival: string; date: string }) => [1,2,3],
+    validate: async (value: unknown, context: { departure: string; arrival: string; date: string }) => ({ allowedOptions: [1,2,3], validation: { isValid: true, normalizedValue: 1 } }),
   }
 });
 
@@ -42,11 +42,11 @@ const badRequires: ValidationSpec<Airline> = {
     // @ts-expect-error - nonexistent field in requires
     requires: ['nonexistent'],
     influencedBy: [],
-    fetchOptions: async () => ['London'],
+    validate: async () => ({ allowedOptions: ['London'], validation: { isValid: true, normalizedValue: 'London' } }),
   },
-  arrival: { requires: [], influencedBy: [], fetchOptions: async () => ['New York'] },
-  date: { requires: [], influencedBy: [], fetchOptions: async () => ['2026-10-01'] },
-  passengers: { requires: [], influencedBy: [], fetchOptions: async () => [1] },
+  arrival: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: ['New York'], validation: { isValid: true, normalizedValue: 'New York' } }) },
+  date: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: ['2026-10-01'], validation: { isValid: true, normalizedValue: '2026-10-01' } }) },
+  passengers: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: [1], validation: { isValid: true, normalizedValue: 1 } }) },
 };
 
 // Invalid: fetchOptions param types must match requires/influencedBy
@@ -55,11 +55,11 @@ const badFetchTypes = defineSpec()({
     requires: [],
     influencedBy: ['arrival'],
     // @ts-expect-error - arrival should be string | undefined; wrong type provided
-    fetchOptions: async (filters: { arrival?: number }) => ['London'],
+    validate: async (value: unknown, context: { arrival?: number }) => ({ allowedOptions: ['London'], validation: { isValid: true, normalizedValue: 'London' } }),
   },
-  arrival: { requires: [], influencedBy: [], fetchOptions: async () => ['New York'] },
-  date: { requires: [], influencedBy: [], fetchOptions: async () => ['2026-10-01'] },
-  passengers: { requires: [], influencedBy: [], fetchOptions: async () => [1] },
+  arrival: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: ['New York'], validation: { isValid: true, normalizedValue: 'New York' } }) },
+  date: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: ['2026-10-01'], validation: { isValid: true, normalizedValue: '2026-10-01' } }) },
+  passengers: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: [1], validation: { isValid: true, normalizedValue: 1 } }) },
 });
 
 // Invalid: influencedBy references a non-existing field
@@ -68,21 +68,21 @@ const badInfluences = defineSpec()({
     requires: [],
     // @ts-expect-error - non-existing field in influencedBy
     influencedBy: ['ghost'],
-    fetchOptions: async () => ['London'],
+    validate: async () => ({ allowedOptions: ['London'], validation: { isValid: true, normalizedValue: 'London' } }),
   },
-  arrival: { requires: [], influencedBy: [], fetchOptions: async () => ['New York'] },
-  date: { requires: [], influencedBy: [], fetchOptions: async () => ['2026-10-01'] },
-  passengers: { requires: [], influencedBy: [], fetchOptions: async () => [1] },
+  arrival: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: ['New York'], validation: { isValid: true, normalizedValue: 'New York' } }) },
+  date: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: ['2026-10-01'], validation: { isValid: true, normalizedValue: '2026-10-01' } }) },
+  passengers: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: [1], validation: { isValid: true, normalizedValue: 1 } }) },
 });
 
 // Invalid: normalize must return domain-typed value or undefined
 const badNormalize = defineSpec()({
-  departure: { requires: [], influencedBy: [], fetchOptions: async () => ['London'],
-    // @ts-expect-error - normalize must return string | undefined for departure
-    normalize: () => 123 },
-  arrival: { requires: [], influencedBy: [], fetchOptions: async () => ['New York'] },
-  date: { requires: [], influencedBy: [], fetchOptions: async () => ['2026-10-01'] },
-  passengers: { requires: [], influencedBy: [], fetchOptions: async () => [1] },
+  departure: { requires: [], influencedBy: [],
+    // @ts-expect-error - validate must return ValidationResult for departure
+    validate: () => 123 as any },
+  arrival: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: ['New York'], validation: { isValid: true, normalizedValue: 'New York' } }) },
+  date: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: ['2026-10-01'], validation: { isValid: true, normalizedValue: '2026-10-01' } }) },
+  passengers: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: [1], validation: { isValid: true, normalizedValue: 1 } }) },
 });
 
 
