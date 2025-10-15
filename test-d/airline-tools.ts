@@ -1,11 +1,15 @@
 import z from "zod";
+import { generateText, Tool } from "ai";
 import { mkTool } from "../src/feedback.js";
 import { defineValidationSpec, compileFixup } from "../src/validation.js";
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+
+import "dotenv/config";
 
 // Shared entries as in examples/airline.ts
 const entries = [
-  { departure: "London", arrival: "New York", date: "2026-10-01", seats: 100 },
-  { departure: "London", arrival: "New York", date: "2026-10-02", seats: 1 },
+  { departure: "london", arrival: "New York", date: "2026-10-01", seats: 100 },
+  { departure: "london", arrival: "NY", date: "2026-10-02", seats: 2 },
   { departure: "Berlin", arrival: "New York", date: "2026-10-03", seats: 2 },
   { departure: "Berlin", arrival: "London", date: "2026-10-04", seats: 2 },
   { departure: "Paris", arrival: "Tokyo", date: "2026-10-05", seats: 50 },
@@ -14,23 +18,26 @@ const entries = [
 
 const uniq = <T,>(values: T[]): T[] => Array.from(new Set(values));
 
+// This type is used as fully validated input for the tool's execute function
 const AirlineBookingSchema = z.object({
-  departure: z.string(),
-  arrival: z.string(),
-  date: z.string(),
-  passengers: z.number(),
+  departure: z.string().min(1),
+  arrival: z.string().min(1),
+  date: z.string().min(1),
+  passengers: z.number().min(1),
 });
-
 type AirlineBooking = z.infer<typeof AirlineBookingSchema>;
 
-const AirlineBookingAttemptSchema = z.object({
-  departure: z.string().optional(),
-  arrival: z.string().optional(),
-  date: z.string().optional(),
-  passengers: z.number().optional(),
+// This type is used as input schema for the LLM tool - partially filled call payload.
+// Some of the fields can be made required, and it would force the LLM to provide them.
+// This type can be quite different from `AirlineBooking`.
+const AirlineBookingForLLMSchema = z.object({
+  departure: z.string().optional().describe("City of departure, if known"),
+  arrival: z.string().optional().describe("City of arrival, if known"),
+  date: z.string().optional().describe("Date of departure, if known"),
+  passengers: z.number().optional().describe("Number of passengers, if known"),
 });
 
-type AirlineBookingAttempt = z.infer<typeof AirlineBookingAttemptSchema>;
+type AirlineBookingForLLM = z.infer<typeof AirlineBookingForLLMSchema>;
 
 const spec = defineValidationSpec<AirlineBooking>()({
   departure: {
@@ -90,19 +97,33 @@ const spec = defineValidationSpec<AirlineBooking>()({
   }
 });
 
-export const airlineValidationTool = mkTool({
+export const airlineValidationTool: any = mkTool({
   inputSchema: AirlineBookingSchema,
   outputSchema: AirlineBookingSchema,
-  looseSchema: AirlineBookingAttemptSchema,
+  looseSchema: AirlineBookingForLLMSchema,
   description: "Validate and compute options for airline booking parameters.",
   fetchState: async () => ({}),
   fixup: compileFixup(spec),
-  execute: async (input) => {
+  execute: async (input: AirlineBooking) => {
     console.log('airlineValidationTool.execute', input);
     return input;
   },
 });
 
-export type AirlineTool = typeof airlineValidationTool;
+// text completion with tools using ai sdk:
+const result = await generateText({
+  model: createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! })(
+    "openai/gpt-5"
+  ),
+  tools: { airlineValidationTool },
+  toolChoice: 'auto',
+  stopWhen: ({ steps }) => steps.length > 5,
+  prompt: `Book a flight from London to New York for 2 passengers on 2026 October 2nd.
+   use tools. try calling tools until you get a successful tool response.
+   If you get a rejection, pay attention to the response validation and rejection reasons and retry.
+   `,
+});
 
+console.log(JSON.stringify(result.content, null, 2));
 
+console.log(result);

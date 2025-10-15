@@ -1,4 +1,5 @@
 import type { defineValidationSpec, ValidationSpec } from '../src/validation.js';
+import type { ToolzyFeedback } from '../src/feedback.js';
 
 // The purpose of this file is to assert compile-time types only (no runtime).
 

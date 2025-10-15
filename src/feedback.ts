@@ -12,30 +12,58 @@ type Tool<InputSchema extends z.ZodTypeAny, OutputSchema extends z.ZodTypeAny> =
 
 };
 
-export type ToolzyFeedback<Value> = {
+type DomainMap = Record<string, unknown>;
+
+export type ReasonFor<D extends DomainMap> = {
+  [K in Extract<keyof D, string>]: {
+    field: K;
+    allowedOptions?: D[K][];
+    refusalReason?: string;
+  }
+}[Extract<keyof D, string>];
+
+export type ToolzyFeedback<Value, D extends DomainMap = DomainMap> = {
   tag: 'rejected',
-  reasons: { field: string; allowedOptions?: string[]; refusalReason?: string }[];
+  reasons: ReasonFor<D>[];
 } | {
   tag: 'accepted',
   value: Value;
 }
 
-type ToolParams<LooseSchema extends z.ZodTypeAny, State, InputSchema extends z.ZodTypeAny, OutputSchema extends z.ZodTypeAny> = {
+type ToolParams<
+  LooseSchema extends z.ZodTypeAny,
+  State,
+  InputSchema extends z.ZodTypeAny,
+  OutputSchema extends z.ZodTypeAny,
+  D extends DomainMap = DomainMap
+> = {
   inputSchema: InputSchema;
   outputSchema: OutputSchema;
   execute: (input: z.infer<InputSchema>, options: unknown) => Promise<z.infer<OutputSchema>>;
   description?: string;
   looseSchema: LooseSchema;
-  fixup: (loozeValue: z.infer<LooseSchema>) => Promise<ToolzyFeedback<z.infer<InputSchema>>>;
+  fixup: (loozeValue: z.infer<LooseSchema>) => Promise<ToolzyFeedback<z.infer<InputSchema>, D>>;
   fetchState: (loozeValue: z.infer<LooseSchema>) => Promise<State>;
 };
 
-export function mkTool<LooseSchema extends z.ZodTypeAny, State, InputSchema extends z.ZodTypeAny, OutputSchema extends z.ZodTypeAny>(
-  toolParams: ToolParams<LooseSchema, State, InputSchema, OutputSchema>
+export function mkTool<
+  LooseSchema extends z.ZodTypeAny,
+  State,
+  InputSchema extends z.ZodTypeAny,
+  OutputSchema extends z.ZodTypeAny,
+  D extends DomainMap = DomainMap
+>(
+  toolParams: ToolParams<LooseSchema, State, InputSchema, OutputSchema, D>
 ) {
   // const paramsWithoutExecute: Omit<Tool<Input, Output>, 'execute'> = omit(toolParams, 'execute');
   const wrappedOutputSchema = z.discriminatedUnion('tag', [
-    z.object({ tag: z.literal('rejected' as const), reasons: z.array(z.object({ field: z.string(), allowedOptions: z.array(z.string()).optional(), refusalReason: z.string().optional() })) }),
+    z.object({ 
+      tag: z.literal('rejected' as const), 
+      reasons: z.array(z.object({ 
+        field: z.string(), 
+        allowedOptions: z.array(z.any()).optional(),
+        refusalReason: z.string().optional() })) 
+      }),
     z.object({ tag: z.literal('accepted' as const), value: toolParams.outputSchema }),
   ]);
   const cns: Tool<LooseSchema, typeof wrappedOutputSchema> = {

@@ -88,6 +88,7 @@ export function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
   }
 
   async function fixup(loose: Partial<D>): Promise<FixupOutcome<D>> {
+    console.log('fixup', loose);
     const options = await computeOptions(loose);
     const normalized: Partial<D> = {};
     const reasons: FeedbackReason<D>[] = [];
@@ -96,12 +97,6 @@ export function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
     for (const k of keys) {
       const rule = spec[k];
       const raw = loose[k];
-
-      // If there are no options for this field under current filters, reject immediately
-      if (options[k].length === 0) {
-        reasons.push({ field: k, refusalReason: 'no options' });
-        continue;
-      }
 
       if (raw === undefined) {
         reasons.push({ field: k, allowedOptions: options[k] });
@@ -131,9 +126,13 @@ export function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
     }
 
     if (reasons.length > 0) {
-      return { tag: 'rejected', reasons, options } as FixupRejected<D>;
+      const res = { tag: 'rejected', reasons, options } as FixupRejected<D>;
+      console.log('fixup rejected:', JSON.stringify(res, null, 2));
+      return res;
     }
-    return { tag: 'accepted', value: normalized as D, options } as FixupAccepted<D>;
+    const res = { tag: 'accepted', value: normalized as D, options } as FixupAccepted<D>;
+    console.log('fixup accepted:', JSON.stringify(res, null, 2));
+    return res;
   }
 
   return fixup;
