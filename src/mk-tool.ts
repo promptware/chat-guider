@@ -180,6 +180,10 @@ function buildToolLoose<
   return tool(t as any) as ReturnType<typeof tool>;
 }
 
+// Implements builder pattern for tool definition
+// Use `.field(...)` for each field in the `D` type, and then 
+// call `.build()` to get the tool.
+// If you miss any of the fields, `.build()` will error on the type level.
 export function mkTool<
   D extends DomainMap,
   LooseSchema extends z.ZodTypeAny,
