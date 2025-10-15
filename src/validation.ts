@@ -1,4 +1,3 @@
-import type { OptionChoice } from './types.js';
 import { detectRequiresCycles } from './graph.js';
 
 export type FeedbackReason<K extends string = string> = {
@@ -10,13 +9,13 @@ export type FeedbackReason<K extends string = string> = {
 export type FixupAccepted<D> = {
   tag: 'accepted';
   value: D;
-  options: { [K in keyof D]: OptionChoice<D[K]>[] };
+  options: { [K in keyof D]: D[K][] };
 };
 
 export type FixupRejected<D> = {
   tag: 'rejected';
   reasons: FeedbackReason<Extract<keyof D, string>>[];
-  options: { [K in keyof D]: OptionChoice<D[K]>[] };
+  options: { [K in keyof D]: D[K][] };
 };
 
 export type FixupOutcome<D> = FixupAccepted<D> | FixupRejected<D>;
@@ -34,12 +33,12 @@ export type FieldRule<
   description?: string;
   fetchOptions: (
     filters: Pick<D, Requires[number]> & Partial<Pick<D, Influences[number]>>
-  ) => Promise<OptionChoice<D[K]>[]> | OptionChoice<D[K]>[];
+  ) => Promise<D[K][]> | D[K][];
   normalize?: (raw: unknown) => D[K] | undefined;
   validate?: (
     value: D[K],
     context: {
-      optionsForField: OptionChoice<D[K]>[];
+      optionsForField: D[K][];
       wholeInput: Partial<D>;
     }
   ) => string | undefined;
@@ -71,8 +70,8 @@ export function defineValidationSpec<D extends Domain>() {
   };
 }
 
-export async function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
-  async function computeOptions(loose: Partial<D>): Promise<{ [K in keyof D]: OptionChoice<D[K]>[] }> {
+export function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
+  async function computeOptions(loose: Partial<D>): Promise<{ [K in keyof D]: D[K][] }> {
     const entries = Object.entries(spec) as [keyof D, FieldRule<D, keyof D>][];
     const results = await Promise.all(entries.map(async ([key, rule]) => {
       const filters: Partial<D> = {};
@@ -98,26 +97,26 @@ export async function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
       const raw = loose[k];
 
       if (raw === undefined) {
-        reasons.push({ field: k as Extract<keyof D, string>, allowedOptions: options[k].map(o => String(o.value)) });
+        reasons.push({ field: k as Extract<keyof D, string>, allowedOptions: options[k].map(v => String(v as any)) });
         continue;
       }
 
       const norm = rule.normalize ? rule.normalize(raw) : (raw as D[typeof k]);
       if (norm === undefined) {
-        reasons.push({ field: k as Extract<keyof D, string>, refusalReason: 'failed to normalize input', allowedOptions: options[k].map(o => String(o.value)) });
+        reasons.push({ field: k as Extract<keyof D, string>, refusalReason: 'failed to normalize input', allowedOptions: options[k].map(v => String(v as any)) });
         continue;
       }
 
       const hasOptions = options[k].length > 0;
-      const isAllowed = hasOptions ? options[k].some(o => Object.is(o.value, norm)) : true;
+      const isAllowed = hasOptions ? options[k].some(v => Object.is(v, norm)) : true;
       if (!isAllowed) {
-        reasons.push({ field: k as Extract<keyof D, string>, allowedOptions: options[k].map(o => String(o.value)) });
+        reasons.push({ field: k as Extract<keyof D, string>, allowedOptions: options[k].map(v => String(v as any)) });
         continue;
       }
 
       const refusal = rule.validate?.(norm, { optionsForField: options[k], wholeInput: loose });
       if (refusal) {
-        reasons.push({ field: k as Extract<keyof D, string>, refusalReason: refusal, allowedOptions: options[k].map(o => String(o.value)) });
+        reasons.push({ field: k as Extract<keyof D, string>, refusalReason: refusal, allowedOptions: options[k].map(v => String(v as any)) });
         continue;
       }
 
@@ -130,7 +129,7 @@ export async function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
     return { tag: 'accepted', value: normalized as D, options } as FixupAccepted<D>;
   }
 
-  return { fixup };
+  return fixup;
 }
 
 

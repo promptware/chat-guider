@@ -18,7 +18,7 @@
     "types": ["node", "mocha", "chai"]
   },
   "include": [
-    "src/**/*",
+    "src/**/*", "examples/airline-tools.ts",
   ],
   "exclude": [
     "node_modules",

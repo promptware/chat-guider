@@ -27,7 +27,7 @@ const spec = defineValidationSpec<Airline>()({
     description: 'City of departure',
     fetchOptions: async (filters) => {
       const filtered = entries.filter(e => (filters.arrival ? e.arrival === filters.arrival : true));
-      return uniq(filtered.map(e => e.departure)).map(v => ({ id: String(v), value: v }));
+      return uniq(filtered.map(e => e.departure));
     }
   },
   arrival: {
@@ -39,7 +39,7 @@ const spec = defineValidationSpec<Airline>()({
         e.departure === filters.departure &&
         (filters.date ? e.date === filters.date : true)
       );
-      return uniq(filtered.map(e => e.arrival)).map(v => ({ id: String(v), value: v }));
+      return uniq(filtered.map(e => e.arrival));
     }
   },
   date: {
@@ -52,7 +52,7 @@ const spec = defineValidationSpec<Airline>()({
         e.arrival === filters.arrival &&
         (filters.passengers ? e.seats >= filters.passengers : true)
       );
-      return uniq(filtered.map(e => e.date)).map(v => ({ id: String(v), value: v }));
+      return uniq(filtered.map(e => e.date));
     }
   },
   passengers: {
@@ -69,10 +69,10 @@ const spec = defineValidationSpec<Airline>()({
         e.arrival === filters.arrival &&
         e.date === filters.date
       );
-      return uniq(filtered.map(e => e.seats)).map(v => ({ id: String(v), value: v }));
+      return uniq(filtered.map(e => e.seats));
     },
     validate: (value, ctx) => {
-      const max = Math.max(0, ...ctx.optionsForField.map(o => Number(o.value)));
+      const max = Math.max(0, ...ctx.optionsForField.map(o => Number(o)));
       return value > max ? 'requested passengers exceed available seats' : undefined;
     }
   }
@@ -80,7 +80,7 @@ const spec = defineValidationSpec<Airline>()({
 
 describe('validation.compileFixup', () => {
   it('rejects when fields are missing and provides allowedOptions', async () => {
-    const { fixup } = await compileFixup(spec);
+    const fixup = compileFixup(spec);
     const res = await fixup({});
     const expected = {
       tag: 'rejected' as const,
@@ -91,12 +91,7 @@ describe('validation.compileFixup', () => {
         { field: 'passengers', allowedOptions: [] },
       ],
       options: {
-        departure: [
-          { id: 'London', value: 'London' },
-          { id: 'Berlin', value: 'Berlin' },
-          { id: 'Paris', value: 'Paris' },
-          { id: 'New York', value: 'New York' },
-        ],
+        departure: ['London','Berlin','Paris','New York'],
         arrival: [],
         date: [],
         passengers: [],
@@ -106,7 +101,7 @@ describe('validation.compileFixup', () => {
   });
 
   it('rejects invalid dependent value with filtered allowedOptions (arrival given departure)', async () => {
-    const { fixup } = await compileFixup(spec);
+    const fixup = compileFixup(spec);
     const res = await fixup({ departure: 'London', arrival: 'Tokyo' });
     const expected = {
       tag: 'rejected' as const,
@@ -117,8 +112,8 @@ describe('validation.compileFixup', () => {
         { field: 'passengers', allowedOptions: [] },
       ],
       options: {
-        departure: [ { id: 'Paris', value: 'Paris' } ],
-        arrival: [ { id: 'New York', value: 'New York' } ],
+        departure: ['Paris'],
+        arrival: ['New York'],
         date: [],
         passengers: [],
       }
@@ -127,7 +122,7 @@ describe('validation.compileFixup', () => {
   });
 
   it('rejects with allowed options when date invalid and passengers too large for available seats', async () => {
-    const { fixup } = await compileFixup(spec);
+    const fixup = compileFixup(spec);
     const res = await fixup({ departure: 'London', arrival: 'New York', date: '2026-10-02', passengers: 5 });
     const expected = {
       tag: 'rejected' as const,
@@ -136,33 +131,33 @@ describe('validation.compileFixup', () => {
         { field: 'passengers', allowedOptions: ['1'] },
       ],
       options: {
-        departure: [ { id: 'London', value: 'London' }, { id: 'Berlin', value: 'Berlin' } ],
-        arrival: [ { id: 'New York', value: 'New York' } ],
-        date: [ { id: '2026-10-01', value: '2026-10-01' } ],
-        passengers: [ { id: '1', value: 1 } ],
+        departure: ['London','Berlin'],
+        arrival: ['New York'],
+        date: ['2026-10-01'],
+        passengers: [1],
       }
     };
     expect(res).to.deep.equal(expected);
   });
 
   it('accepts a valid full selection', async () => {
-    const { fixup } = await compileFixup(spec);
+    const fixup = compileFixup(spec);
     const res = await fixup({ departure: 'Berlin', arrival: 'London', date: '2026-10-04', passengers: 2 });
     const expected = {
       tag: 'accepted' as const,
       value: { departure: 'Berlin', arrival: 'London', date: '2026-10-04', passengers: 2 },
       options: {
-        departure: [ { id: 'Berlin', value: 'Berlin' } ],
-        arrival: [ { id: 'London', value: 'London' } ],
-        date: [ { id: '2026-10-04', value: '2026-10-04' } ],
-        passengers: [ { id: '2', value: 2 } ],
+        departure: ['Berlin'],
+        arrival: ['London'],
+        date: ['2026-10-04'],
+        passengers: [2],
       }
     };
     expect(res).to.deep.equal(expected);
   });
 
   it('options are always included even when rejected', async () => {
-    const { fixup } = await compileFixup(spec);
+    const fixup = compileFixup(spec);
     const res = await fixup({ departure: 'Paris', passengers: 1000 });
     const expected = {
       tag: 'rejected' as const,
@@ -172,8 +167,8 @@ describe('validation.compileFixup', () => {
         { field: 'passengers', refusalReason: 'requested passengers exceed available seats', allowedOptions: [] },
       ],
       options: {
-        departure: [ { id: 'London', value: 'London' }, { id: 'Berlin', value: 'Berlin' }, { id: 'Paris', value: 'Paris' }, { id: 'New York', value: 'New York' } ],
-        arrival: [ { id: 'Tokyo', value: 'Tokyo' } ],
+        departure: ['London','Berlin','Paris','New York'],
+        arrival: ['Tokyo'],
         date: [],
         passengers: [],
       }
