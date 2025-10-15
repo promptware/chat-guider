@@ -1,3 +1,25 @@
+import z from "zod";
+import { mkTool } from "../src/mk-tool.js";
+
+type D = { a: string; b: number };
+
+const DSchema = z.object({ a: z.string(), b: z.number() });
+const Loose = z.object({ a: z.string().optional(), b: z.number().optional() });
+const Out = z.object({ ok: z.boolean() });
+
+// Exhaustiveness should be enforced at build()
+// Building early should be a type error (no dummy arg accepted)
+mkTool<D, typeof Loose, typeof Out>({ schema: DSchema, toolSchema: Loose, outputSchema: Out, execute: async (v) => ({ ok: !!v }) })
+  .field('a', { requires: [], influencedBy: [] as const, validate: async () => ({ isValid: true, normalizedValue: 'x' }) })
+  // @ts-expect-error - cannot build before adding all fields
+  .build();
+
+// Correct usage: both fields then build()
+mkTool<D, typeof Loose, typeof Out>({ schema: DSchema, toolSchema: Loose, outputSchema: Out, execute: async (v) => ({ ok: !!v }) })
+  .field('a', { requires: [], influencedBy: [] as const, validate: async () => ({ isValid: true, normalizedValue: 'x' }) })
+  .field('b', { requires: ['a'] as const, influencedBy: [] as const, validate: async (v, ctx: { a: string }) => ({ isValid: true, normalizedValue: 1 }) })
+  .build();
+
 import { ToolzyFeedback } from "../src/feedback.js";
 
 type Airline = {

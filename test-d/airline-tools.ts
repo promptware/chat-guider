@@ -1,7 +1,6 @@
 import z from "zod";
 import { generateText, Tool } from "ai";
-import { mkTool } from "../src/feedback.js";
-import { defineValidationSpec, compileFixup } from "../src/validation.js";
+import { mkTool } from "../src/mk-tool.js";
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 
 import "dotenv/config";
@@ -39,49 +38,55 @@ const AirlineBookingForLLMSchema = z.object({
 
 type AirlineBookingForLLM = z.infer<typeof AirlineBookingForLLMSchema>;
 
-const spec = defineValidationSpec<AirlineBooking>()({
-  departure: {
+export const airlineValidationTool: any = mkTool<AirlineBooking, typeof AirlineBookingForLLMSchema, typeof AirlineBookingSchema>({
+  schema: AirlineBookingSchema,
+  toolSchema: AirlineBookingForLLMSchema,
+  outputSchema: AirlineBookingSchema,
+  description: "Validate and compute options for airline booking parameters.",
+  execute: async (input: AirlineBooking) => input,
+})
+  .field('departure', {
     requires: [],
-    influencedBy: ['arrival'],
+    influencedBy: ['arrival'] as const,
     description: "City of departure",
     validate: async (value: string | undefined, context: { arrival?: string }) => {
       const filtered = entries.filter(e => (context.arrival ? e.arrival === context.arrival : true));
       const allowed = uniq(filtered.map(e => e.departure));
       const normalized = typeof value === 'string' ? value : undefined;
       if (normalized === undefined) return { allowedOptions: allowed };
-      if (!allowed.some(v => Object.is(v, normalized))) return { allowedOptions: allowed, validation: { isValid: false, refusalReason: 'no matching options' } };
-      return { allowedOptions: allowed, validation: { isValid: true, normalizedValue: normalized } };
-    }
-  },
-  arrival: {
-    requires: ['departure'],
-    influencedBy: ['date'],
+      if (!allowed.some(v => Object.is(v, normalized))) return { allowedOptions: allowed, isValid: false, refusalReason: 'no matching options' };
+      return { allowedOptions: allowed, isValid: true, normalizedValue: normalized };
+    },
+  })
+  .field('arrival', {
+    requires: ['departure'] as const,
+    influencedBy: ['date'] as const,
     description: "City of arrival",
     validate: async (value: string | undefined, context: { departure: string; date?: string }) => {
       const filtered = entries.filter(e => e.departure === context.departure && (context.date ? e.date === context.date : true));
       const allowed = uniq(filtered.map(e => e.arrival));
       const normalized = typeof value === 'string' ? value : undefined;
       if (normalized === undefined) return { allowedOptions: allowed };
-      if (!allowed.some(v => Object.is(v, normalized))) return { allowedOptions: allowed, validation: { isValid: false, refusalReason: 'no matching options' } };
-      return { allowedOptions: allowed, validation: { isValid: true, normalizedValue: normalized } };
-    }
-  },
-  date: {
-    requires: ['departure','arrival'],
-    influencedBy: ['passengers'],
+      if (!allowed.some(v => Object.is(v, normalized))) return { allowedOptions: allowed, isValid: false, refusalReason: 'no matching options' };
+      return { allowedOptions: allowed, isValid: true, normalizedValue: normalized };
+    },
+  })
+  .field('date', {
+    requires: ['departure','arrival'] as const,
+    influencedBy: ['passengers'] as const,
     description: "Date of departure",
     validate: async (value: string | undefined, context: { departure: string; arrival: string; passengers?: number }) => {
       const filtered = entries.filter(e => e.departure === context.departure && e.arrival === context.arrival && (context.passengers ? e.seats >= context.passengers : true));
       const allowed = uniq(filtered.map(e => e.date));
       const normalized = typeof value === 'string' ? value : undefined;
       if (normalized === undefined) return { allowedOptions: allowed };
-      if (!allowed.some(v => Object.is(v, normalized))) return { allowedOptions: allowed, validation: { isValid: false, refusalReason: 'no matching options' } };
-      return { allowedOptions: allowed, validation: { isValid: true, normalizedValue: normalized } };
-    }
-  },
-  passengers: {
-    requires: ['departure','arrival','date'],
-    influencedBy: [],
+      if (!allowed.some(v => Object.is(v, normalized))) return { allowedOptions: allowed, isValid: false, refusalReason: 'no matching options' };
+      return { allowedOptions: allowed, isValid: true, normalizedValue: normalized };
+    },
+  })
+  .field('passengers', {
+    requires: ['departure','arrival','date'] as const,
+    influencedBy: [] as const,
     description: "Number of passengers",
     validate: async (value: number | undefined, context: { departure: string; arrival: string; date: string }) => {
       const filtered = entries.filter(e => e.departure === context.departure && e.arrival === context.arrival && e.date === context.date);
@@ -90,24 +95,11 @@ const spec = defineValidationSpec<AirlineBooking>()({
       const normalized = typeof rawNum === 'number' && Number.isFinite(rawNum) && rawNum > 0 ? rawNum : undefined;
       if (normalized === undefined) return { allowedOptions: allowed };
       const max = Math.max(0, ...allowed.map(o => Number(o)));
-      if (normalized > max) return { allowedOptions: allowed, validation: { isValid: false, refusalReason: 'no matching options' } };
-      return { allowedOptions: allowed, validation: { isValid: true, normalizedValue: normalized } };
-    }
-  }
-});
-
-export const airlineValidationTool: any = mkTool({
-  inputSchema: AirlineBookingSchema,
-  outputSchema: AirlineBookingSchema,
-  looseSchema: AirlineBookingForLLMSchema,
-  description: "Validate and compute options for airline booking parameters.",
-  fetchState: async () => ({}),
-  fixup: compileFixup(spec),
-  execute: async (input: AirlineBooking) => {
-    console.log('airlineValidationTool.execute', input);
-    return input;
-  },
-});
+      if (normalized > max) return { allowedOptions: allowed, isValid: false, refusalReason: 'no matching options' };
+      return { allowedOptions: allowed, isValid: true, normalizedValue: normalized };
+    },
+  })
+  .build();
 
 // text completion with tools using ai sdk:
 const result = await generateText({
