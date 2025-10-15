@@ -53,7 +53,7 @@ const spec = defineValidationSpec<AirlineBooking>()({
     requires: ['departure'],
     influencedBy: ['date'],
     description: "City of arrival",
-    fetchOptions: async (filters: { departure: string; date?: string }) => {
+    fetchOptions: async (filters: { departure: string; date: string }) => {
       const filtered = entries.filter(e =>
         e.departure === filters.departure &&
         (filters.date ? e.date === filters.date : true)

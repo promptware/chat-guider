@@ -84,18 +84,12 @@ describe('validation.compileFixup', () => {
     const res = await fixup({});
     const expected = {
       tag: 'rejected' as const,
-      reasons: [
-        { field: 'departure', allowedOptions: ['London','Berlin','Paris','New York'] },
-        { field: 'arrival', refusalReason: 'no options' },
-        { field: 'date', refusalReason: 'no options' },
-        { field: 'passengers', refusalReason: 'no options' },
-      ],
-      options: {
-        departure: ['London','Berlin','Paris','New York'],
-        arrival: [],
-        date: [],
-        passengers: [],
-      }
+      validationResults: {
+        departure: { valid: false, allowedOptions: ['London','Berlin','Paris','New York'] },
+        arrival: { valid: false, refusalReason: 'requires a valid departure first' },
+        date: { valid: false, refusalReason: 'requires a valid departure, arrival first' },
+        passengers: { valid: false, refusalReason: 'requires a valid departure, arrival, date first' },
+      },
     };
     expect(res).to.deep.equal(expected);
   });
@@ -105,18 +99,12 @@ describe('validation.compileFixup', () => {
     const res = await fixup({ departure: 'London', arrival: 'Tokyo' });
     const expected = {
       tag: 'rejected' as const,
-      reasons: [
-        { field: 'departure', allowedOptions: ['Paris'] },
-        { field: 'arrival', allowedOptions: ['New York'] },
-        { field: 'date', refusalReason: 'no options' },
-        { field: 'passengers', refusalReason: 'no options' },
-      ],
-      options: {
-        departure: ['Paris'],
-        arrival: ['New York'],
-        date: [],
-        passengers: [],
-      }
+      validationResults: {
+        departure: { valid: true, allowedOptions: ['London','Berlin','Paris','New York'] },
+        arrival: { valid: false, refusalReason: 'no matching options', allowedOptions: ['New York'] },
+        date: { valid: false, refusalReason: 'requires a valid arrival first' },
+        passengers: { valid: false, refusalReason: 'requires a valid arrival, date first' },
+      },
     };
     expect(res).to.deep.equal(expected);
   });
@@ -126,16 +114,12 @@ describe('validation.compileFixup', () => {
     const res = await fixup({ departure: 'London', arrival: 'New York', date: '2026-10-02', passengers: 5 });
     const expected = {
       tag: 'rejected' as const,
-      reasons: [
-        { field: 'date', allowedOptions: ['2026-10-01'] },
-        { field: 'passengers', allowedOptions: [1] },
-      ],
-      options: {
-        departure: ['London','Berlin'],
-        arrival: ['New York'],
-        date: ['2026-10-01'],
-        passengers: [1],
-      }
+      validationResults: {
+        departure: { valid: true, allowedOptions: ['London','Berlin','Paris','New York'] },
+        arrival: { valid: true, allowedOptions: ['New York'] },
+        date: { valid: true, allowedOptions: ['2026-10-01','2026-10-02'] },
+        passengers: { valid: false, refusalReason: 'no matching options', allowedOptions: [1] },
+      },
     };
     expect(res).to.deep.equal(expected);
   });
@@ -146,12 +130,6 @@ describe('validation.compileFixup', () => {
     const expected = {
       tag: 'accepted' as const,
       value: { departure: 'Berlin', arrival: 'London', date: '2026-10-04', passengers: 2 },
-      options: {
-        departure: ['Berlin'],
-        arrival: ['London'],
-        date: ['2026-10-04'],
-        passengers: [2],
-      }
     };
     expect(res).to.deep.equal(expected);
   });
@@ -161,17 +139,12 @@ describe('validation.compileFixup', () => {
     const res = await fixup({ departure: 'Paris', passengers: 1000 });
     const expected = {
       tag: 'rejected' as const,
-      reasons: [
-        { field: 'arrival', allowedOptions: ['Tokyo'] },
-        { field: 'date', refusalReason: 'no options' },
-        { field: 'passengers', refusalReason: 'no options' },
-      ],
-      options: {
-        departure: ['London','Berlin','Paris','New York'],
-        arrival: ['Tokyo'],
-        date: [],
-        passengers: [],
-      }
+      validationResults: {
+        departure: { valid: true, allowedOptions: ['London','Berlin','Paris','New York'] },
+        arrival: { valid: false, allowedOptions: ['Tokyo'] },
+        date: { valid: false, refusalReason: 'requires a valid arrival first' },
+        passengers: { valid: false, refusalReason: 'requires a valid arrival, date first' },
+      },
     };
     expect(res).to.deep.equal(expected);
   });

@@ -8,7 +8,7 @@
     "**/*",
     "../src/**/*",
     "../examples/**/*"
-  ],
+, "../legacy-runtime.ts"  ],
   "exclude": [
     "../node_modules",
     "../dist",
