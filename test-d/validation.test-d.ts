@@ -1,4 +1,4 @@
-import type { defineValidationSpec, ValidationSpec } from '../src/validation.js';
+import { defineValidationSpec, type ValidationSpec } from '../src/validation.js';
 import type { ToolzyFeedback } from '../src/feedback.js';
 
 // The purpose of this file is to assert compile-time types only (no runtime).
@@ -10,10 +10,8 @@ type Airline = {
   passengers: number;
 };
 
-declare const defineSpec: typeof defineValidationSpec<Airline>;
-
 // Valid spec should type-check
-const validSpec = defineSpec()({
+const validSpec = defineValidationSpec<Airline>()({
   departure: {
     requires: [],
     influencedBy: ['arrival'],
@@ -50,7 +48,7 @@ const badRequires: ValidationSpec<Airline> = {
 };
 
 // Invalid: fetchOptions param types must match requires/influencedBy
-const badFetchTypes = defineSpec()({
+const badFetchTypes = defineValidationSpec<Airline>()({
   departure: {
     requires: [],
     influencedBy: ['arrival'],
@@ -63,7 +61,7 @@ const badFetchTypes = defineSpec()({
 });
 
 // Invalid: influencedBy references a non-existing field
-const badInfluences = defineSpec()({
+const badInfluences = defineValidationSpec<Airline>()({
   departure: {
     requires: [],
     // @ts-expect-error - non-existing field in influencedBy
@@ -76,13 +74,11 @@ const badInfluences = defineSpec()({
 });
 
 // Invalid: normalize must return domain-typed value or undefined
-const badNormalize = defineSpec()({
+const badNormalize = defineValidationSpec<Airline>()({
   departure: { requires: [], influencedBy: [],
-    // @ts-expect-error - validate must return ValidationResult for departure
-    validate: () => 123 as any },
-  arrival: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: ['New York'], validation: { isValid: true, normalizedValue: 'New York' } }) },
-  date: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: ['2026-10-01'], validation: { isValid: true, normalizedValue: '2026-10-01' } }) },
-  passengers: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: [1], validation: { isValid: true, normalizedValue: 1 } }) },
-});
-
+    validate: async () => ({ allowedOptions: ['London'], isValid: true, normalizedValue: 123 }) },
+  arrival: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: ['New York'], isValid: true, normalizedValue: 'New York' }) },
+  date: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: ['2026-10-01'], isValid: true, normalizedValue: '2026-10-01' }) },
+  passengers: { requires: [], influencedBy: [], validate: async () => ({ allowedOptions: [1], isValid: true, normalizedValue: 1 }) },
+})
 
