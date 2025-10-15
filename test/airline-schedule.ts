@@ -20,12 +20,11 @@ export class AirlineSchedule {
 
   getAvailableFlights(filters: FlightFilters = {}): FlightEntry[] {
     const { departure, arrival, date } = filters;
-    return this.flights.filter(f =>
-      (departure ? f.departure === departure : true) &&
-      (arrival ? f.arrival === arrival : true) &&
-      (date ? f.date === date : true)
+    return this.flights.filter(
+      f =>
+        (departure ? f.departure === departure : true) &&
+        (arrival ? f.arrival === arrival : true) &&
+        (date ? f.date === date : true),
     );
   }
 }
-
-

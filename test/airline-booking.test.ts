@@ -7,7 +7,7 @@ import { mkTool } from '../src/mk-tool.js';
 import 'dotenv/config';
 import { AirlineSchedule, FlightFilters } from './airline-schedule.js';
 
-const uniq = <T,>(values: T[]): T[] => Array.from(new Set(values));
+const uniq = <T>(values: T[]): T[] => Array.from(new Set(values));
 
 const AirlineBookingSchema = z.object({
   departure: z.string().min(1),
@@ -27,7 +27,6 @@ type AirlineBookingForLLM = z.infer<typeof AirlineBookingForLLMSchema>;
 
 type AirlineBooking = z.infer<typeof AirlineBookingSchema>;
 
-
 describe('mkTool airline tool', () => {
   it('executes and returns accepted value', async function () {
     this.timeout(100000);
@@ -41,7 +40,11 @@ describe('mkTool airline tool', () => {
     ]);
     const responseReceivedController = new AbortController();
     let executeCalledWith: AirlineBooking | null = null;
-    const airlineValidationTool = mkTool<AirlineBooking, typeof AirlineBookingForLLMSchema, typeof AirlineBookingSchema>({
+    const airlineValidationTool = mkTool<
+      AirlineBooking,
+      typeof AirlineBookingForLLMSchema,
+      typeof AirlineBookingSchema
+    >({
       schema: AirlineBookingSchema,
       toolSchema: AirlineBookingForLLMSchema,
       outputSchema: AirlineBookingSchema,
@@ -70,7 +73,10 @@ describe('mkTool airline tool', () => {
         requires: ['departure'],
         influencedBy: ['date'],
         description: 'City of arrival',
-        validate: async (value: string | undefined, context: { departure: string; date?: string }) => {
+        validate: async (
+          value: string | undefined,
+          context: { departure: string; date?: string },
+        ) => {
           const filter: FlightFilters = context;
           const availableFlights = schedule.getAvailableFlights(filter);
           const allowedOptions = uniq(availableFlights.map(e => e.arrival));
@@ -81,10 +87,13 @@ describe('mkTool airline tool', () => {
         },
       })
       .field('date', {
-        requires: ['departure','arrival'],
+        requires: ['departure', 'arrival'],
         influencedBy: ['passengers'],
         description: 'Date of departure',
-        validate: async (value: string | undefined, context: { departure: string; arrival: string; passengers?: number }) => {
+        validate: async (
+          value: string | undefined,
+          context: { departure: string; arrival: string; passengers?: number },
+        ) => {
           const filter: FlightFilters = context;
           const availableFlights = schedule.getAvailableFlights(filter);
           const allowedOptions = uniq(availableFlights.map(e => e.date));
@@ -95,10 +104,13 @@ describe('mkTool airline tool', () => {
         },
       })
       .field('passengers', {
-        requires: ['departure','arrival','date'],
+        requires: ['departure', 'arrival', 'date'],
         influencedBy: [],
         description: 'Number of passengers',
-        validate: async (value: number | undefined, context: { departure: string; arrival: string; date: string }) => {
+        validate: async (
+          value: number | undefined,
+          context: { departure: string; arrival: string; date: string },
+        ) => {
           const filter: FlightFilters = context;
           const availableFlights = schedule.getAvailableFlights(filter);
           if (typeof value !== 'number') {
@@ -106,7 +118,10 @@ describe('mkTool airline tool', () => {
           }
           const max = Math.max(0, ...availableFlights.map(e => e.seats));
           if (value > max) {
-            return { isValid: false, refusalReason: 'not enough seats available (max is ' + max + ')' };
+            return {
+              isValid: false,
+              refusalReason: 'not enough seats available (max is ' + max + ')',
+            };
           }
           return { isValid: true, normalizedValue: value };
         },
@@ -133,9 +148,12 @@ describe('mkTool airline tool', () => {
         throw error;
       }
     }
-    const expectedFlight: AirlineBooking = { departure: 'london', arrival: 'NEW_YORK', date: '2026-10-02', passengers: 2 };
+    const expectedFlight: AirlineBooking = {
+      departure: 'london',
+      arrival: 'NEW_YORK',
+      date: '2026-10-02',
+      passengers: 2,
+    };
     expect(executeCalledWith).to.deep.equal(expectedFlight);
   });
 });
-
-

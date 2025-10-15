@@ -1,0 +1,15 @@
+node_modules
+dist
+.pnpm-store
+.turbo
+.cache
+coverage
+*.log
+*.lock
+*.map
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+*.snap
+*.min.*
+

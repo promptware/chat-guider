@@ -1,6 +1,8 @@
 import type { Flow, SomeParameterType } from './types.js';
 
-export function detectRequiresCycles<D extends Record<string, SomeParameterType>>(spec: Flow<D>): string[][] {
+export function detectRequiresCycles<D extends Record<string, SomeParameterType>>(
+  spec: Flow<D>,
+): string[][] {
   const visited = new Set<string>();
   const inStack = new Set<string>();
   const cycles: string[][] = [];
@@ -31,4 +33,4 @@ export function detectRequiresCycles<D extends Record<string, SomeParameterType>
   }
 
   return cycles;
-} 
+}

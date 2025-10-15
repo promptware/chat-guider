@@ -21,9 +21,9 @@ export type FixupOutcome<D extends Domain> = FixupAccepted<D> | FixupRejected<D>
 export type Domain = Record<string, unknown>;
 
 // All good, normalized the value
-export type ValidationOk<T> = { isValid: true; normalizedValue: T; };
+export type ValidationOk<T> = { isValid: true; normalizedValue: T };
 // Error with refusal reason + allowed options
-export type ValidationErr<T> = { isValid: false; refusalReason: string, allowedOptions?: T[] };
+export type ValidationErr<T> = { isValid: false; refusalReason: string; allowedOptions?: T[] };
 // If the value was not provided, we can just show allowed options that depend on context
 export type ValidationSkip<T> = { allowedOptions?: T[] };
 export type ValidationResult<T> = ValidationOk<T> | ValidationErr<T> | ValidationSkip<T>;
@@ -32,14 +32,14 @@ export type FieldRule<
   D extends Domain,
   K extends keyof D,
   Requires extends Exclude<keyof D, K>[] = Exclude<keyof D, K>[],
-  Influences extends Exclude<keyof D, K>[] = Exclude<keyof D, K>[]
+  Influences extends Exclude<keyof D, K>[] = Exclude<keyof D, K>[],
 > = {
   requires: Requires;
   influencedBy: Influences;
   description?: string;
   validate: (
     value: D[K] | undefined,
-    context: Pick<D, Requires[number]> & Partial<Pick<D, Influences[number]>>
+    context: Pick<D, Requires[number]> & Partial<Pick<D, Influences[number]>>,
   ) => Promise<ValidationResult<D[K]>>;
 };
 
@@ -68,8 +68,11 @@ export function defineValidationSpec<D extends Domain>() {
 }
 
 export function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
-  function haveAllRequires<K extends keyof D>(rule: FieldRule<D, K>, provided: Partial<D>): boolean {
-    return rule.requires.every((req) => provided[req] !== undefined);
+  function haveAllRequires<K extends keyof D>(
+    rule: FieldRule<D, K>,
+    provided: Partial<D>,
+  ): boolean {
+    return rule.requires.every(req => provided[req] !== undefined);
   }
 
   // Local type aliases for cleaner types
@@ -83,10 +86,13 @@ export function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
     rule: FieldRule<D, K>,
     normalized: Partial<D>,
     validationResults: ValidationMap,
-    providedValue: D[K] | undefined
+    providedValue: D[K] | undefined,
   ): Promise<ValidationResult<D[K]>> {
     if (!haveAllRequires(rule, normalized)) {
-      console.log('fixup:inactive:requires-missing', { field: String(key), requires: rule.requires });
+      console.log('fixup:inactive:requires-missing', {
+        field: String(key),
+        requires: rule.requires,
+      });
       return {} as ValidationResult<D[K]>;
     }
     // Build context using only valid influencedBy values
@@ -106,7 +112,7 @@ export function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
       field: String(key),
       context,
       providedValue,
-      validationResult: resp
+      validationResult: resp,
     });
     return resp as ValidationResult<D[K]>;
   }
@@ -123,7 +129,7 @@ export function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
     for (const k of keys) {
       const rule = spec[k];
       // A field is ready only if all requires are present AND previously validated as not invalid
-      const requiresReady = (rule.requires as (keyof D)[]).every((dep) => {
+      const requiresReady = (rule.requires as (keyof D)[]).every(dep => {
         const present = normalized[dep] !== undefined;
         const depVr = validationResults[dep];
         const isValid = depVr && depVr.valid === true;
@@ -141,26 +147,49 @@ export function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
         }
         const msg = `requires a valid ${missing.join(', ')} first`;
         console.log('fixup:skip (missing requirements)', { field: k, missing });
-        (validationResults as ValidationMap)[k as keyof D] = { valid: false, refusalReason: msg } as FieldFeedback<D, any>;
+        (validationResults as ValidationMap)[k as keyof D] = {
+          valid: false,
+          refusalReason: msg,
+        } as FieldFeedback<D, any>;
         continue;
       }
 
-      const resp = await validateIfReady(k as keyof D, rule as FieldRule<D, keyof D>, normalized, validationResults, loose[k as keyof D] as D[keyof D] | undefined);
-      const allowed = ('allowedOptions' in resp ? resp.allowedOptions : undefined) as D[keyof D][] | undefined;
+      const resp = await validateIfReady(
+        k as keyof D,
+        rule as FieldRule<D, keyof D>,
+        normalized,
+        validationResults,
+        loose[k as keyof D] as D[keyof D] | undefined,
+      );
+      const allowed = ('allowedOptions' in resp ? resp.allowedOptions : undefined) as
+        | D[keyof D][]
+        | undefined;
       if ('isValid' in resp && resp.isValid === true) {
         const norm = resp.normalizedValue as D[typeof k];
         normalized[k as keyof D] = norm;
-        (validationResults as ValidationMap)[k as keyof D] = { valid: true, allowedOptions: allowed } as FieldFeedback<D, any>;
+        (validationResults as ValidationMap)[k as keyof D] = {
+          valid: true,
+          allowedOptions: allowed,
+        } as FieldFeedback<D, any>;
       } else if ('isValid' in resp && resp.isValid === false) {
-        (validationResults as ValidationMap)[k as keyof D] = { valid: false, refusalReason: resp.refusalReason, allowedOptions: allowed } as FieldFeedback<D, any>;
+        (validationResults as ValidationMap)[k as keyof D] = {
+          valid: false,
+          refusalReason: resp.refusalReason,
+          allowedOptions: allowed,
+        } as FieldFeedback<D, any>;
       } else {
         // ValidationSkip: just allowedOptions for context without refusalReason
-        (validationResults as ValidationMap)[k as keyof D] = { valid: false, allowedOptions: allowed } as FieldFeedback<D, any>;
+        (validationResults as ValidationMap)[k as keyof D] = {
+          valid: false,
+          allowedOptions: allowed,
+        } as FieldFeedback<D, any>;
       }
     }
 
     // 4) Decide outcome
-    const allValid = keys.every(k => (validationResults as ValidationMap)[k as keyof D]?.valid === true);
+    const allValid = keys.every(
+      k => (validationResults as ValidationMap)[k as keyof D]?.valid === true,
+    );
     const allPresent = keys.every(k => normalized[k as keyof D] !== undefined);
     if (!allValid || !allPresent) {
       const res = { tag: 'rejected', validationResults } as FixupRejected<D>;
@@ -175,5 +204,3 @@ export function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
 
   return fixup;
 }
-
-

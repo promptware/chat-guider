@@ -17,18 +17,12 @@
     "typeRoots": ["./node_modules/@types"],
     "types": ["node", "mocha", "chai"]
   },
-  "include": [
-    "src/**/*.ts", "test/**/*.ts",
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "test-d"
-  ],
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "dist", "test-d"],
   "ts-node": {
     "esm": true,
     "compilerOptions": {
       "module": "ES2022"
     }
   }
-} 
+}
