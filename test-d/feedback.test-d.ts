@@ -67,24 +67,24 @@ const okFeedbackRejected: Feedback = {
   },
 };
 
-// @ts-expect-error passengers allowedOptions must be number[]
 const badFeedbackPassengers: Feedback = {
   tag: 'rejected',
   validationResults: {
     departure: { valid: true },
     arrival: { valid: true },
     date: { valid: true },
+    // @ts-expect-error passengers allowedOptions must be number[]
     passengers: { valid: true, allowedOptions: ['1'] },
   },
 };
 
-// @ts-expect-error departure allowedOptions must be string[]
 const badFeedbackDeparture: Feedback = {
   tag: 'rejected',
   validationResults: {
     passengers: { valid: true },
     arrival: { valid: true },
     date: { valid: true },
+    // @ts-expect-error departure allowedOptions must be string[]
     departure: { valid: true, allowedOptions: [1] },
   },
 };

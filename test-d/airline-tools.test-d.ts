@@ -38,7 +38,7 @@ const AirlineBookingForLLMSchema = z.object({
 
 type AirlineBookingForLLM = z.infer<typeof AirlineBookingForLLMSchema>;
 
-export const airlineValidationTool: any = mkTool<
+export const tool1 = mkTool<
   AirlineBooking,
   typeof AirlineBookingForLLMSchema,
   typeof AirlineBookingSchema
@@ -51,7 +51,8 @@ export const airlineValidationTool: any = mkTool<
 })
   .field('departure', {
     requires: [],
-    influencedBy: ['arrival'],
+    // @ts-expect-error influencedBy must include existing fields
+    influencedBy: ['nonexistent'],
     description: 'City of departure',
     validate: async (value: string | undefined, context: { arrival?: string }) => {
       const filtered = entries.filter(e =>
@@ -69,7 +70,8 @@ export const airlineValidationTool: any = mkTool<
     requires: ['departure'],
     influencedBy: ['date'],
     description: 'City of arrival',
-    validate: async (value: string | undefined, context: { departure: string; date?: string }) => {
+    // @ts-expect-error value must be string | undefined
+    validate: async (value: null | undefined, context: { departure: string; date?: string }) => {
       const filtered = entries.filter(
         e => e.departure === context.departure && (context.date ? e.date === context.date : true),
       );
@@ -82,9 +84,10 @@ export const airlineValidationTool: any = mkTool<
     },
   })
   .field('date', {
-    requires: ['departure', 'arrival'],
+    requires: ['departure'],
     influencedBy: ['passengers'],
     description: 'Date of departure',
+    // @ts-expect-error arrival is not in required list
     validate: async (
       value: string | undefined,
       context: { departure: string; arrival: string; passengers?: number },
@@ -102,7 +105,12 @@ export const airlineValidationTool: any = mkTool<
         return { allowedOptions: allowed, isValid: false, refusalReason: 'no matching options' };
       return { allowedOptions: allowed, isValid: true, normalizedValue: normalized };
     },
-  })
+  });
+
+// @ts-expect-error build is not available, missing `passengers` field
+const buildCheckedTool1 = tool1.build();
+
+const bookFlight = tool1
   .field('passengers', {
     requires: ['departure', 'arrival', 'date'],
     influencedBy: [],
@@ -131,9 +139,11 @@ export const airlineValidationTool: any = mkTool<
   .build();
 
 // text completion with tools using ai sdk:
-const result = await generateText({
+// this will fail obviously, because we muted critical errors
+// just an example.
+const _ = generateText({
   model: createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! })('openai/gpt-5'),
-  tools: { airlineValidationTool },
+  tools: { bookFlight: bookFlight },
   toolChoice: 'auto',
   stopWhen: ({ steps }) => steps.length > 5,
   prompt: `Book a flight from London to New York for 2 passengers on 2026 October 2nd if you can. Do not choose closest options. Only exactly matching is allowed.
@@ -141,7 +151,3 @@ const result = await generateText({
    If you get a rejection, pay attention to the response validation and rejection reasons and retry.
    `,
 });
-
-console.log(JSON.stringify(result.content, null, 2));
-
-console.log(result);

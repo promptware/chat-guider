@@ -51,6 +51,9 @@ importers:
       mocha:
         specifier: ^11.5.0
         version: 11.5.0
+      mocha-suppress-logs:
+        specifier: ^0.6.0
+        version: 0.6.0
       prettier:
         specifier: ^3.6.2
         version: 3.6.2
@@ -389,6 +392,10 @@ packages:
     resolution: {integrity: sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ==}
     engines: {node: '>=12'}
 
+  clone@2.1.2:
+    resolution: {integrity: sha512-3Pe/CF1Nn94hyhIYpjtiLhdCoEoz0DqQ+988E9gmeEdQZlojxnOb74wctFyuwWQHzqyf9X7C7MG8juUpqBJT8w==}
+    engines: {node: '>=0.8'}
+
   color-convert@2.0.1:
     resolution: {integrity: sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==}
     engines: {node: '>=7.0.0'}
@@ -630,6 +637,9 @@ packages:
   minipass@7.1.2:
     resolution: {integrity: sha512-qOOzS1cBTWYF4BH8fVePDBOO9iptMnGUEZwNc/cMWnTV2nVLZ7VoNWEPHkYczZA0pdoA7dl6e7FL659nX9S2aw==}
     engines: {node: '>=16 || 14 >=14.17'}
+
+  mocha-suppress-logs@0.6.0:
+    resolution: {integrity: sha512-cDn7TwkxlcWeXKDYfKrQliGBljTNPKB1/k5doF4TGzAVC/edKGbAM28vsYRTA57h0Y+yaVQbgSmIqYySBNEmfQ==}
 
   mocha@11.5.0:
     resolution: {integrity: sha512-VKDjhy6LMTKm0WgNEdlY77YVsD49LZnPSXJAaPNL9NRYQADxvORsyG1DIQY6v53BKTnlNbEE2MbVCDbnxr4K3w==}
@@ -1068,6 +1078,8 @@ snapshots:
       strip-ansi: 6.0.1
       wrap-ansi: 7.0.0
 
+  clone@2.1.2: {}
+
   color-convert@2.0.1:
     dependencies:
       color-name: 1.1.4
@@ -1305,6 +1317,10 @@ snapshots:
       brace-expansion: 2.0.1
 
   minipass@7.1.2: {}
+
+  mocha-suppress-logs@0.6.0:
+    dependencies:
+      clone: 2.1.2
 
   mocha@11.5.0:
     dependencies:

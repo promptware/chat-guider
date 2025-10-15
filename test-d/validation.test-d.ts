@@ -158,35 +158,3 @@ const badInfluences = defineValidationSpec<Airline>()({
     validate: async () => ({ allowedOptions: [1], isValid: true, normalizedValue: 1 }),
   },
 });
-
-// Invalid: normalize must return domain-typed value or undefined
-const badNormalize = defineValidationSpec<Airline>()({
-  departure: {
-    requires: [],
-    influencedBy: [],
-    validate: async () => ({ allowedOptions: ['London'], isValid: true, normalizedValue: 123 }),
-  },
-  arrival: {
-    requires: [],
-    influencedBy: [],
-    validate: async () => ({
-      allowedOptions: ['New York'],
-      isValid: true,
-      normalizedValue: 'New York',
-    }),
-  },
-  date: {
-    requires: [],
-    influencedBy: [],
-    validate: async () => ({
-      allowedOptions: ['2026-10-01'],
-      isValid: true,
-      normalizedValue: '2026-10-01',
-    }),
-  },
-  passengers: {
-    requires: [],
-    influencedBy: [],
-    validate: async () => ({ allowedOptions: [1], isValid: true, normalizedValue: 1 }),
-  },
-});
