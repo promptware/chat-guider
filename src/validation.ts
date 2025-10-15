@@ -101,8 +101,13 @@ export function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
       if (v !== undefined && vr && vr.valid === true) entries.push([String(inf), v]);
     }
     const context = Object.fromEntries(entries) as unknown as ContextFor<K>;
-    console.log('fixup:validate', { field: String(key), context });
     const resp = await rule.validate(providedValue, context);
+    console.log('fixup:validate:', {
+      field: String(key),
+      context,
+      providedValue,
+      validationResult: resp
+    });
     return resp as ValidationResult<D[K]>;
   }
 
@@ -135,7 +140,7 @@ export function compileFixup<D extends Domain>(spec: ValidationSpec<D>) {
           if (!present || invalid) missing.push(depKey);
         }
         const msg = `requires a valid ${missing.join(', ')} first`;
-        console.log('fixup:inactive-field', { field: k, missing });
+        console.log('fixup:skip (missing requirements)', { field: k, missing });
         (validationResults as ValidationMap)[k as keyof D] = { valid: false, refusalReason: msg } as FieldFeedback<D, any>;
         continue;
       }

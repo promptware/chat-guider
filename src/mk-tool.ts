@@ -51,14 +51,22 @@ type BuilderApi<
     R extends readonly (Exclude<keyof D, K>)[],
     I extends readonly (Exclude<keyof D, K>)[]
   >(key: K, cfg: FieldConfig<D, K, R, I>) => BuilderApi<D, LooseSchema, OutputSchema, Added | K>;
+  // build: returns an SDK Tool with erased generics to avoid deep type instantiation at call sites
   build: (
     ...args: Exclude<keyof D, Added> extends never ? [] : [arg: never]
   ) => AreAllFieldsAdded<keyof D, Added> extends true
-    ? ReturnType<typeof buildTool<D, LooseSchema, OutputSchema>>
+    ? ReturnType<typeof tool>
+    : never;
+  // buildChecked: preserves stronger generic typing (may cause heavy inference when unified with external types)
+  buildChecked: (
+    ...args: Exclude<keyof D, Added> extends never ? [] : [arg: never]
+  ) => AreAllFieldsAdded<keyof D, Added> extends true
+    ? ReturnType<typeof buildToolChecked<D, LooseSchema, OutputSchema>>
     : never;
 };
 
-function buildTool<
+// Strongly-typed builder (checked) — keeps precise generics on schemas
+function buildToolChecked<
   D extends DomainMap,
   LooseSchema extends z.ZodTypeAny,
   OutputSchema extends z.ZodTypeAny
@@ -115,6 +123,63 @@ function buildTool<
   return toolFn(t);
 }
 
+// Erased builder (loose) — returns SDK Tool with erased generics to avoid deep type instantiation
+function buildToolLoose<
+  D extends DomainMap,
+  LooseSchema extends z.ZodTypeAny,
+  OutputSchema extends z.ZodTypeAny
+>(
+  params: MkToolParams<D, LooseSchema, OutputSchema>,
+  spec: ValidationSpec<D>
+): ReturnType<typeof tool> {
+  // Cycle detection on the dependency graph upfront (defensive runtime check)
+  const flowLike: Record<string, { requires: string[]; influencedBy: string[]; description: string }> = {};
+  for (const key of Object.keys(spec) as (keyof D)[]) {
+    const rule = spec[key];
+    flowLike[String(key)] = {
+      requires: rule.requires as string[],
+      influencedBy: rule.influencedBy as string[],
+      description: rule.description ?? '',
+    };
+  }
+  const cycles = detectRequiresCycles(flowLike as any);
+  if (cycles.length > 0) {
+    const msg = cycles.map(c => c.join(' -> ')).join('; ');
+    throw new Error(`Cycle detected in requires graph: ${msg}`);
+  }
+
+  const fixup = compileFixup(spec);
+
+  const wrappedOutputSchema = z.discriminatedUnion('tag', [
+    z.object({
+      tag: z.literal('rejected' as const),
+      validationResults: z.record(
+        z.object({
+          valid: z.boolean(),
+          allowedOptions: z.array(z.any()).optional(),
+          refusalReason: z.string().optional(),
+        })
+      ),
+    }),
+    z.object({ tag: z.literal('accepted' as const), value: params.outputSchema }),
+  ]) as z.ZodTypeAny;
+
+  const t: ToolLike<z.ZodTypeAny, z.ZodTypeAny> = {
+    inputSchema: params.toolSchema as z.ZodTypeAny,
+    outputSchema: wrappedOutputSchema as z.ZodTypeAny,
+    description: params.description,
+    execute: async (input: unknown, options: unknown) => {
+      const result = await fixup(input as Partial<D>);
+      if (result.tag === 'rejected') {
+        return { tag: 'rejected' as const, validationResults: (result as any).validationResults } as any;
+      }
+      const value = await params.execute(result.value as D);
+      return { tag: 'accepted' as const, value } as any;
+    },
+  };
+  return tool(t as any) as ReturnType<typeof tool>;
+}
+
 export function mkTool<
   D extends DomainMap,
   LooseSchema extends z.ZodTypeAny,
@@ -134,7 +199,8 @@ export function mkTool<
       const next: BuilderState<D> = { spec: nextSpec };
       return makeApi<D, LooseSchema, OutputSchema, typeof key>(params, next) as any;
     },
-    build: (((..._args: any[]) => buildTool<D, LooseSchema, OutputSchema>(params, state.spec as ValidationSpec<D>)) as BuilderApi<D, LooseSchema, OutputSchema, never>['build']),
+    build: (((..._args: any[]) => buildToolLoose<D, LooseSchema, OutputSchema>(params, state.spec as ValidationSpec<D>)) as BuilderApi<D, LooseSchema, OutputSchema, never>['build']),
+    buildChecked: (((..._args: any[]) => buildToolChecked<D, LooseSchema, OutputSchema>(params, state.spec as ValidationSpec<D>)) as BuilderApi<D, LooseSchema, OutputSchema, never>['buildChecked']),
   };
   return api;
 }
@@ -160,7 +226,8 @@ function makeApi<
       const nextState: BuilderState<D> = { spec: nextSpec };
       return makeApi<D, LooseSchema, OutputSchema, Added | typeof key>(params, nextState) as any;
     },
-    build: (((..._args: any[]) => buildTool<D, LooseSchema, OutputSchema>(params, state.spec as ValidationSpec<D>)) as BuilderApi<D, LooseSchema, OutputSchema, Added>['build']),
+    build: (((..._args: any[]) => buildToolLoose<D, LooseSchema, OutputSchema>(params, state.spec as ValidationSpec<D>)) as BuilderApi<D, LooseSchema, OutputSchema, Added>['build']),
+    buildChecked: (((..._args: any[]) => buildToolChecked<D, LooseSchema, OutputSchema>(params, state.spec as ValidationSpec<D>)) as BuilderApi<D, LooseSchema, OutputSchema, Added>['buildChecked']),
   } as BuilderApi<D, LooseSchema, OutputSchema, Added>;
 }
 

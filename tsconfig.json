@@ -18,12 +18,11 @@
     "types": ["node", "mocha", "chai"]
   },
   "include": [
-    "src/**/*", "examples/airline-tools.ts", "legacy-runtime.ts",
+    "src/**/*.ts", "test/**/*.ts",
   ],
   "exclude": [
     "node_modules",
     "dist",
-    "test",
     "test-d"
   ],
   "ts-node": {
