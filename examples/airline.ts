@@ -1,7 +1,6 @@
 import * as readline from 'readline';
 import _ from 'lodash';
-import { 
-  Parameter, 
+import {
   Flow,
   parameter,
   runFlow,
@@ -9,10 +8,10 @@ import {
 
 // Define the parameter types
 type Params = {
-  departure: Parameter<string>;
-  arrival: Parameter<string>;
-  date: Parameter<string>;
-  passengers: Parameter<number>;
+  departure: string;
+  arrival: string;
+  date: string;
+  passengers: number;
 };
 
 // Sample airline data

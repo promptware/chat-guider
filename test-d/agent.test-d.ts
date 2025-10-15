@@ -1,4 +1,4 @@
-import { Flow } from "../src/types";
+import { Flow, ParamSpec } from "../src/types";
 import { parameter } from "../src/runtime";
 import { AgentBase, flow } from "../src/agent";
 import _ from 'lodash';
@@ -17,7 +17,7 @@ const entries = [
   { departure: "Berlin", arrival: "London", date: "2026-10-04", seats: 2 },
 ];
 
-const arrival = parameter<Params, "arrival", ["departure"], ["date"]>("arrival", {
+const arrival: ParamSpec<Params, "arrival", ["departure"], ["date"]> = parameter("arrival", {
   description: "City of arrival",
   requires: ['departure'],
   influencedBy: ['date'],
@@ -28,7 +28,7 @@ const arrival = parameter<Params, "arrival", ["departure"], ["date"]>("arrival",
     );
     return _.uniq(matches.map(e => e.arrival)).map(value => ({ value, id: value }));
   },
-})
+});
 
 // This should compile without errors - demonstrates the types work correctly
 const bookFlightSpec: Flow<Params> = {
@@ -96,7 +96,10 @@ class TouristAgencyAgent extends AgentBase {
     return "Everything for your travel";
   }
 
-  @flow(bookFlightSpec)
+  @flow(
+    "Book a flight",
+    bookFlightSpec
+  )
   public bookFlight ({arrival, departure, date, passengers}: Params) {
     console.log('bookFlight', arrival, departure, date, passengers);
   }
