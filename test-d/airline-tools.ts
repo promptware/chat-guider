@@ -8,7 +8,7 @@ import "dotenv/config";
 // Shared entries as in examples/airline.ts
 const entries = [
   { departure: "london", arrival: "New York", date: "2026-10-01", seats: 100 },
-  { departure: "london", arrival: "NY", date: "2026-10-02", seats: 2 },
+  { departure: "london", arrival: "NEW_YORK", date: "2026-10-02", seats: 2 },
   { departure: "Berlin", arrival: "New York", date: "2026-10-03", seats: 2 },
   { departure: "Berlin", arrival: "London", date: "2026-10-04", seats: 2 },
   { departure: "Paris", arrival: "Tokyo", date: "2026-10-05", seats: 50 },
@@ -47,7 +47,7 @@ export const airlineValidationTool: any = mkTool<AirlineBooking, typeof AirlineB
 })
   .field('departure', {
     requires: [],
-    influencedBy: ['arrival'] as const,
+    influencedBy: ['arrival'],
     description: "City of departure",
     validate: async (value: string | undefined, context: { arrival?: string }) => {
       const filtered = entries.filter(e => (context.arrival ? e.arrival === context.arrival : true));
@@ -59,8 +59,8 @@ export const airlineValidationTool: any = mkTool<AirlineBooking, typeof AirlineB
     },
   })
   .field('arrival', {
-    requires: ['departure'] as const,
-    influencedBy: ['date'] as const,
+    requires: ['departure'],
+    influencedBy: ['date'],
     description: "City of arrival",
     validate: async (value: string | undefined, context: { departure: string; date?: string }) => {
       const filtered = entries.filter(e => e.departure === context.departure && (context.date ? e.date === context.date : true));
@@ -72,8 +72,8 @@ export const airlineValidationTool: any = mkTool<AirlineBooking, typeof AirlineB
     },
   })
   .field('date', {
-    requires: ['departure','arrival'] as const,
-    influencedBy: ['passengers'] as const,
+    requires: ['departure','arrival'],
+    influencedBy: ['passengers'],
     description: "Date of departure",
     validate: async (value: string | undefined, context: { departure: string; arrival: string; passengers?: number }) => {
       const filtered = entries.filter(e => e.departure === context.departure && e.arrival === context.arrival && (context.passengers ? e.seats >= context.passengers : true));
@@ -85,8 +85,8 @@ export const airlineValidationTool: any = mkTool<AirlineBooking, typeof AirlineB
     },
   })
   .field('passengers', {
-    requires: ['departure','arrival','date'] as const,
-    influencedBy: [] as const,
+    requires: ['departure','arrival','date'],
+    influencedBy: [],
     description: "Number of passengers",
     validate: async (value: number | undefined, context: { departure: string; arrival: string; date: string }) => {
       const filtered = entries.filter(e => e.departure === context.departure && e.arrival === context.arrival && e.date === context.date);
@@ -109,7 +109,7 @@ const result = await generateText({
   tools: { airlineValidationTool },
   toolChoice: 'auto',
   stopWhen: ({ steps }) => steps.length > 5,
-  prompt: `Book a flight from London to New York for 2 passengers on 2026 October 2nd.
+  prompt: `Book a flight from London to New York for 2 passengers on 2026 October 2nd if you can. Do not choose closest options. Only exactly matching is allowed.
    use tools. try calling tools until you get a successful tool response.
    If you get a rejection, pay attention to the response validation and rejection reasons and retry.
    `,
