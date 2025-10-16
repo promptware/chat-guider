@@ -60,10 +60,14 @@ export const tool1 = mkTool<
       );
       const allowed = uniq(filtered.map(e => e.departure));
       const normalized = typeof value === 'string' ? value : undefined;
-      if (normalized === undefined) return { allowedOptions: allowed };
+      if (normalized === undefined) return { allowedOptions: allowed, valid: false as const };
       if (!allowed.some(v => Object.is(v, normalized)))
-        return { allowedOptions: allowed, isValid: false, refusalReason: 'no matching options' };
-      return { allowedOptions: allowed, isValid: true, normalizedValue: normalized };
+        return {
+          allowedOptions: allowed,
+          valid: false as const,
+          refusalReason: 'no matching options',
+        };
+      return { allowedOptions: allowed, valid: true as const, normalizedValue: normalized };
     },
   })
   .field('arrival', {
@@ -79,8 +83,8 @@ export const tool1 = mkTool<
       const normalized = typeof value === 'string' ? value : undefined;
       if (normalized === undefined) return { allowedOptions: allowed };
       if (!allowed.some(v => Object.is(v, normalized)))
-        return { allowedOptions: allowed, isValid: false, refusalReason: 'no matching options' };
-      return { allowedOptions: allowed, isValid: true, normalizedValue: normalized };
+        return { allowedOptions: allowed, valid: false, refusalReason: 'no matching options' };
+      return { allowedOptions: allowed, valid: true, normalizedValue: normalized };
     },
   })
   .field('date', {
@@ -102,8 +106,8 @@ export const tool1 = mkTool<
       const normalized = typeof value === 'string' ? value : undefined;
       if (normalized === undefined) return { allowedOptions: allowed };
       if (!allowed.some(v => Object.is(v, normalized)))
-        return { allowedOptions: allowed, isValid: false, refusalReason: 'no matching options' };
-      return { allowedOptions: allowed, isValid: true, normalizedValue: normalized };
+        return { allowedOptions: allowed, valid: false, refusalReason: 'no matching options' };
+      return { allowedOptions: allowed, valid: true, normalizedValue: normalized };
     },
   });
 
@@ -129,11 +133,11 @@ const bookFlight = tool1
       const rawNum = typeof value === 'string' ? Number(value) : value;
       const normalized =
         typeof rawNum === 'number' && Number.isFinite(rawNum) && rawNum > 0 ? rawNum : undefined;
-      if (normalized === undefined) return { allowedOptions: allowed };
+      if (normalized === undefined) return { allowedOptions: allowed, valid: false as const };
       const max = Math.max(0, ...allowed.map(o => Number(o)));
       if (normalized > max)
-        return { allowedOptions: allowed, isValid: false, refusalReason: 'no matching options' };
-      return { allowedOptions: allowed, isValid: true, normalizedValue: normalized };
+        return { allowedOptions: allowed, valid: false, refusalReason: 'no matching options' };
+      return { allowedOptions: allowed, valid: true, normalizedValue: normalized };
     },
   })
   .build();

@@ -2,24 +2,27 @@ import z from 'zod';
 import { tool } from 'ai';
 import {
   compileFixup,
-  type Domain,
-  type FieldRule,
-  type ValidationResult,
-  type ValidationSpec,
+  ToolCallRejected,
+  ToolCallResult,
+  type DomainType,
+  type FieldSpec,
+  type ToolSpec,
 } from './validation.js';
 import { detectRequiresCycles } from './graph.js';
-
-type DomainMap = Domain;
+import { type FieldFeedback } from './feedback.js';
 
 type ToolLike<InputSchema extends z.ZodTypeAny, OutputSchema extends z.ZodTypeAny> = {
   inputSchema: InputSchema;
   outputSchema: OutputSchema;
-  execute: (input: z.infer<InputSchema>, options: unknown) => Promise<z.infer<OutputSchema>>;
+  execute: (
+    input: z.infer<InputSchema>,
+    options: unknown,
+  ) => Promise<ToolCallResult<z.infer<OutputSchema>>>;
   description?: string;
 };
 
 type MkToolParams<
-  D extends DomainMap,
+  D extends DomainType,
   LooseSchema extends z.ZodTypeAny,
   OutputSchema extends z.ZodTypeAny,
 > = {
@@ -33,12 +36,12 @@ type MkToolParams<
 type AreAllFieldsAdded<All extends PropertyKey, Added extends PropertyKey> =
   Exclude<All, Added> extends never ? true : false;
 
-type BuilderState<D extends DomainMap> = {
-  readonly spec: Partial<ValidationSpec<D>>;
+type BuilderState<D extends DomainType> = {
+  readonly spec: Partial<ToolSpec<D>>;
 };
 
 export type FieldConfig<
-  D extends DomainMap,
+  D extends DomainType,
   K extends keyof D,
   Requires extends readonly Exclude<keyof D, K>[] = readonly Exclude<keyof D, K>[],
   Influences extends readonly Exclude<keyof D, K>[] = readonly Exclude<keyof D, K>[],
@@ -49,11 +52,13 @@ export type FieldConfig<
   validate: (
     value: D[K] | undefined,
     context: Pick<D, Requires[number]> & Partial<Pick<D, Influences[number]>>,
-  ) => Promise<ValidationResult<D[K]>>;
+  ) => Promise<FieldFeedback<D[K]>>;
 };
 
+export const HiddenSpecSymbol = Symbol('HiddenSpec');
+
 type BuilderApi<
-  D extends DomainMap,
+  D extends DomainType,
   LooseSchema extends z.ZodTypeAny,
   OutputSchema extends z.ZodTypeAny,
   Added extends keyof D,
@@ -69,21 +74,24 @@ type BuilderApi<
   // build: returns an SDK Tool with erased generics to avoid deep type instantiation at call sites
   build: (
     ...args: Exclude<keyof D, Added> extends never ? [] : [arg: never]
-  ) => AreAllFieldsAdded<keyof D, Added> extends true ? ReturnType<typeof tool> : never;
+  ) => AreAllFieldsAdded<keyof D, Added> extends true
+    ? ReturnType<typeof tool & { [HiddenSpecSymbol]: ToolSpec<D> }>
+    : never;
   // buildChecked: preserves stronger generic typing (may cause heavy inference when unified with external types)
   buildChecked: (
     ...args: Exclude<keyof D, Added> extends never ? [] : [arg: never]
   ) => AreAllFieldsAdded<keyof D, Added> extends true
     ? ReturnType<typeof buildToolChecked<D, LooseSchema, OutputSchema>>
     : never;
+  spec: ToolSpec<D>;
 };
 
 // Strongly-typed builder (checked) — keeps precise generics on schemas
 function buildToolChecked<
-  D extends DomainMap,
+  D extends DomainType,
   LooseSchema extends z.ZodTypeAny,
   OutputSchema extends z.ZodTypeAny,
->(params: MkToolParams<D, LooseSchema, OutputSchema>, spec: ValidationSpec<D>) {
+>(params: MkToolParams<D, LooseSchema, OutputSchema>, spec: ToolSpec<D>) {
   // Cycle detection on the dependency graph upfront (defensive runtime check)
   const flowLike: Record<
     string,
@@ -119,20 +127,20 @@ function buildToolChecked<
     z.object({ tag: z.literal('accepted' as const), value: params.outputSchema }),
   ]);
 
+  type WrappedOutputSchema = z.infer<typeof wrappedOutputSchema>;
+  type WrappedToolCallResult = ToolCallResult<WrappedOutputSchema>;
+
   const t: ToolLike<LooseSchema, typeof wrappedOutputSchema> = {
     inputSchema: params.toolSchema,
     outputSchema: wrappedOutputSchema,
     description: params.description,
-    execute: async (input: z.infer<LooseSchema>, options: unknown) => {
-      const result = await fixup(input as Partial<D>);
-      if (result.tag === 'rejected') {
-        return {
-          tag: 'rejected' as const,
-          validationResults: (result as any).validationResults,
-        } as z.infer<typeof wrappedOutputSchema>;
+    execute: async (input: z.infer<LooseSchema>, options: any): Promise<WrappedToolCallResult> => {
+      const result: ToolCallResult<D> = await fixup(input as Partial<D>);
+      if (result.status === 'rejected') {
+        return result as ToolCallRejected<WrappedOutputSchema>;
       }
       const value = await params.execute(result.value as D);
-      return { tag: 'accepted' as const, value } as z.infer<typeof wrappedOutputSchema>;
+      return { status: 'accepted', value };
     },
   };
   const toolFn = tool as unknown as <T>(args: T) => T;
@@ -141,13 +149,10 @@ function buildToolChecked<
 
 // Erased builder (loose) — returns SDK Tool with erased generics to avoid deep type instantiation
 function buildToolLoose<
-  D extends DomainMap,
+  D extends DomainType,
   LooseSchema extends z.ZodTypeAny,
   OutputSchema extends z.ZodTypeAny,
->(
-  params: MkToolParams<D, LooseSchema, OutputSchema>,
-  spec: ValidationSpec<D>,
-): ReturnType<typeof tool> {
+>(params: MkToolParams<D, LooseSchema, OutputSchema>, spec: ToolSpec<D>): ReturnType<typeof tool> {
   // Cycle detection on the dependency graph upfront (defensive runtime check)
   const flowLike: Record<
     string,
@@ -169,9 +174,9 @@ function buildToolLoose<
 
   const fixup = compileFixup(spec);
 
-  const wrappedOutputSchema = z.discriminatedUnion('tag', [
+  const wrappedOutputSchema = z.discriminatedUnion('status', [
     z.object({
-      tag: z.literal('rejected' as const),
+      status: z.literal('rejected' as const),
       validationResults: z.record(
         z.object({
           valid: z.boolean(),
@@ -180,7 +185,7 @@ function buildToolLoose<
         }),
       ),
     }),
-    z.object({ tag: z.literal('accepted' as const), value: params.outputSchema }),
+    z.object({ status: z.literal('accepted' as const), value: params.outputSchema }),
   ]) as z.ZodTypeAny;
 
   const t: ToolLike<z.ZodTypeAny, z.ZodTypeAny> = {
@@ -189,9 +194,9 @@ function buildToolLoose<
     description: params.description,
     execute: async (input: unknown, options: unknown) => {
       const result = await fixup(input as Partial<D>);
-      if (result.tag === 'rejected') {
+      if (result.status === 'rejected') {
         return {
-          tag: 'rejected' as const,
+          status: 'rejected' as const,
           validationResults: (result as any).validationResults,
         } as any;
       }
@@ -199,7 +204,9 @@ function buildToolLoose<
       return { tag: 'accepted' as const, value } as any;
     },
   };
-  return tool(t as any) as ReturnType<typeof tool>;
+  const ret = tool(t as any) as ReturnType<typeof tool>;
+  (ret as any)[HiddenSpecSymbol] = spec;
+  return ret as ReturnType<typeof tool & { [HiddenSpecSymbol]: ToolSpec<D> }>;
 }
 
 // Implements builder pattern for tool definition
@@ -207,7 +214,7 @@ function buildToolLoose<
 // call `.build()` to get the tool.
 // If you miss any of the fields, `.build()` will error on the type level.
 export function mkTool<
-  D extends DomainMap,
+  D extends DomainType,
   LooseSchema extends z.ZodTypeAny,
   OutputSchema extends z.ZodTypeAny,
 >(
@@ -216,37 +223,40 @@ export function mkTool<
   const state: BuilderState<D> = { spec: {} };
 
   const api: BuilderApi<D, LooseSchema, OutputSchema, never> = {
+    spec: state.spec as ToolSpec<D>, // a lie :)
     field: (key, cfg) => {
-      const normalizedCfg: FieldRule<D, typeof key> = {
-        requires: [
-          ...(cfg.requires as readonly Exclude<keyof D, typeof key>[]),
-        ] as unknown as Exclude<keyof D, typeof key>[],
-        influencedBy: [
-          ...(cfg.influencedBy as readonly Exclude<keyof D, typeof key>[]),
-        ] as unknown as Exclude<keyof D, typeof key>[],
+      const normalizedCfg: FieldSpec<D, typeof key> = {
+        requires: [...(cfg.requires as readonly Exclude<keyof D, typeof key>[])] as Exclude<
+          keyof D,
+          typeof key
+        >[],
+        influencedBy: [...(cfg.influencedBy as readonly Exclude<keyof D, typeof key>[])] as Exclude<
+          keyof D,
+          typeof key
+        >[],
         description: cfg.description,
         validate: cfg.validate as any,
       };
-      const nextSpec: Partial<ValidationSpec<D>> = { ...state.spec, [key]: normalizedCfg };
+      const nextSpec: Partial<ToolSpec<D>> = { ...state.spec, [key]: normalizedCfg };
       const next: BuilderState<D> = { spec: nextSpec };
       return makeApi<D, LooseSchema, OutputSchema, typeof key>(params, next) as any;
     },
     build: ((..._args: any[]) =>
       buildToolLoose<D, LooseSchema, OutputSchema>(
         params,
-        state.spec as ValidationSpec<D>,
+        state.spec as ToolSpec<D>,
       )) as BuilderApi<D, LooseSchema, OutputSchema, never>['build'],
     buildChecked: ((..._args: any[]) =>
       buildToolChecked<D, LooseSchema, OutputSchema>(
         params,
-        state.spec as ValidationSpec<D>,
+        state.spec as ToolSpec<D>,
       )) as BuilderApi<D, LooseSchema, OutputSchema, never>['buildChecked'],
   };
   return api;
 }
 
 function makeApi<
-  D extends DomainMap,
+  D extends DomainType,
   LooseSchema extends z.ZodTypeAny,
   OutputSchema extends z.ZodTypeAny,
   Added extends keyof D,
@@ -256,7 +266,7 @@ function makeApi<
 ): BuilderApi<D, LooseSchema, OutputSchema, Added> {
   return {
     field: (key, cfg) => {
-      const normalizedCfg: FieldRule<D, typeof key> = {
+      const normalizedCfg: FieldSpec<D, typeof key> = {
         requires: [
           ...(cfg.requires as readonly Exclude<keyof D, typeof key>[]),
         ] as unknown as Exclude<keyof D, typeof key>[],
@@ -266,19 +276,19 @@ function makeApi<
         description: cfg.description,
         validate: cfg.validate as any,
       };
-      const nextSpec: Partial<ValidationSpec<D>> = { ...state.spec, [key]: normalizedCfg };
+      const nextSpec: Partial<ToolSpec<D>> = { ...state.spec, [key]: normalizedCfg };
       const nextState: BuilderState<D> = { spec: nextSpec };
       return makeApi<D, LooseSchema, OutputSchema, Added | typeof key>(params, nextState) as any;
     },
     build: ((..._args: any[]) =>
       buildToolLoose<D, LooseSchema, OutputSchema>(
         params,
-        state.spec as ValidationSpec<D>,
+        state.spec as ToolSpec<D>,
       )) as BuilderApi<D, LooseSchema, OutputSchema, Added>['build'],
     buildChecked: ((..._args: any[]) =>
       buildToolChecked<D, LooseSchema, OutputSchema>(
         params,
-        state.spec as ValidationSpec<D>,
+        state.spec as ToolSpec<D>,
       )) as BuilderApi<D, LooseSchema, OutputSchema, Added>['buildChecked'],
   } as BuilderApi<D, LooseSchema, OutputSchema, Added>;
 }

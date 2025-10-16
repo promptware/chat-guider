@@ -18,7 +18,7 @@ mkTool<D, typeof Loose, typeof Out>({
   .field('a', {
     requires: [],
     influencedBy: [] as const,
-    validate: async () => ({ isValid: true, normalizedValue: 'x' }),
+    validate: async () => ({ valid: true, normalizedValue: 'x' }),
   })
   // @ts-expect-error - cannot build before adding all fields
   .build();
@@ -33,12 +33,12 @@ mkTool<D, typeof Loose, typeof Out>({
   .field('a', {
     requires: [],
     influencedBy: [] as const,
-    validate: async () => ({ isValid: true, normalizedValue: 'x' }),
+    validate: async () => ({ valid: true, normalizedValue: 'x' }),
   })
   .field('b', {
     requires: ['a'] as const,
     influencedBy: [] as const,
-    validate: async (v, ctx: { a: string }) => ({ isValid: true, normalizedValue: 1 }),
+    validate: async (v, ctx: { a: string }) => ({ valid: true, normalizedValue: 1 }),
   })
   .build();
 

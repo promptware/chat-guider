@@ -1,0 +1,8 @@
+---
+alwaysApply: true
+---
+We use three kinds of tests:
+
+test:unit - instant tests that do not require runtime. must have *.unit.test.ts name.
+test:runtime - LLM tests, slow. *.test.ts file names.
+test:types - instant typechecking tests, with negative examples, located in test-d/

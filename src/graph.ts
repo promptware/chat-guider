@@ -1,7 +1,5 @@
-import type { Flow, SomeParameterType } from './types.js';
-
-export function detectRequiresCycles<D extends Record<string, SomeParameterType>>(
-  spec: Flow<D>,
+export function detectRequiresCycles(
+  spec: Record<string, { requires: string[]; influencedBy: string[] }>,
 ): string[][] {
   const visited = new Set<string>();
   const inStack = new Set<string>();
@@ -21,7 +19,6 @@ export function detectRequiresCycles<D extends Record<string, SomeParameterType>
 
     const requires = spec[node]?.requires ?? [];
     for (const neighbor of requires) {
-      // @ts-expect-error: may be a symbol or a number
       dfs(neighbor, [...path, node]);
     }
 

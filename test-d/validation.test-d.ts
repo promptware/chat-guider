@@ -1,4 +1,4 @@
-import { defineValidationSpec, type ValidationSpec } from '../src/validation.js';
+import { defineToolSpec, type ToolSpec } from '../src/validation.js';
 import type { ToolzyFeedback } from '../src/feedback.js';
 
 // The purpose of this file is to assert compile-time types only (no runtime).
@@ -11,13 +11,13 @@ type Airline = {
 };
 
 // Valid spec should type-check
-const validSpec = defineValidationSpec<Airline>()({
+const validSpec = defineToolSpec<Airline>()({
   departure: {
     requires: [],
     influencedBy: ['arrival'],
     validate: async (value: unknown, context: { arrival?: string }) => ({
       allowedOptions: ['London', 'Berlin'],
-      isValid: true,
+      valid: true,
       normalizedValue: 'London',
     }),
   },
@@ -26,7 +26,7 @@ const validSpec = defineValidationSpec<Airline>()({
     influencedBy: ['date'],
     validate: async (value: unknown, context: { departure: string; date?: string }) => ({
       allowedOptions: ['New York'],
-      isValid: true,
+      valid: true,
       normalizedValue: 'New York',
     }),
   },
@@ -36,7 +36,7 @@ const validSpec = defineValidationSpec<Airline>()({
     validate: async (
       value: unknown,
       context: { departure: string; arrival: string; passengers?: number },
-    ) => ({ allowedOptions: ['2026-10-01'], isValid: true, normalizedValue: '2026-10-01' }),
+    ) => ({ allowedOptions: ['2026-10-01'], valid: true, normalizedValue: '2026-10-01' }),
   },
   passengers: {
     requires: ['departure', 'arrival', 'date'],
@@ -44,19 +44,19 @@ const validSpec = defineValidationSpec<Airline>()({
     validate: async (
       value: unknown,
       context: { departure: string; arrival: string; date: string },
-    ) => ({ allowedOptions: [1, 2, 3], isValid: true, normalizedValue: 1 }),
+    ) => ({ allowedOptions: [1, 2, 3], valid: true, normalizedValue: 1 }),
   },
 });
 
 // Invalid: reference missing field in requires
-const badRequires: ValidationSpec<Airline> = {
+const badRequires: ToolSpec<Airline> = {
   departure: {
     // @ts-expect-error - nonexistent field in requires
     requires: ['nonexistent'],
     influencedBy: [],
     validate: async () => ({
       allowedOptions: ['London'],
-      isValid: true,
+      valid: true,
       normalizedValue: 'London',
     }),
   },
@@ -65,7 +65,7 @@ const badRequires: ValidationSpec<Airline> = {
     influencedBy: [],
     validate: async () => ({
       allowedOptions: ['New York'],
-      isValid: true,
+      valid: true,
       normalizedValue: 'New York',
     }),
   },
@@ -74,26 +74,26 @@ const badRequires: ValidationSpec<Airline> = {
     influencedBy: [],
     validate: async () => ({
       allowedOptions: ['2026-10-01'],
-      isValid: true,
+      valid: true,
       normalizedValue: '2026-10-01',
     }),
   },
   passengers: {
     requires: [],
     influencedBy: [],
-    validate: async () => ({ allowedOptions: [1], isValid: true, normalizedValue: 1 }),
+    validate: async () => ({ allowedOptions: [1], valid: true, normalizedValue: 1 }),
   },
 };
 
 // Invalid: fetchOptions param types must match requires/influencedBy
-const badFetchTypes = defineValidationSpec<Airline>()({
+const badFetchTypes = defineToolSpec<Airline>()({
   departure: {
     requires: [],
     influencedBy: ['arrival'],
     // @ts-expect-error - arrival should be string | undefined; wrong type provided
     validate: async (value: unknown, context: { arrival?: number }) => ({
       allowedOptions: ['London'],
-      isValid: true,
+      valid: true,
       normalizedValue: 'London',
     }),
   },
@@ -102,7 +102,7 @@ const badFetchTypes = defineValidationSpec<Airline>()({
     influencedBy: [],
     validate: async () => ({
       allowedOptions: ['New York'],
-      isValid: true,
+      valid: true,
       normalizedValue: 'New York',
     }),
   },
@@ -111,26 +111,26 @@ const badFetchTypes = defineValidationSpec<Airline>()({
     influencedBy: [],
     validate: async () => ({
       allowedOptions: ['2026-10-01'],
-      isValid: true,
+      valid: true,
       normalizedValue: '2026-10-01',
     }),
   },
   passengers: {
     requires: [],
     influencedBy: [],
-    validate: async () => ({ allowedOptions: [1], isValid: true, normalizedValue: 1 }),
+    validate: async () => ({ allowedOptions: [1], valid: true, normalizedValue: 1 }),
   },
 });
 
 // Invalid: influencedBy references a non-existing field
-const badInfluences = defineValidationSpec<Airline>()({
+const badInfluences = defineToolSpec<Airline>()({
   departure: {
     requires: [],
     // @ts-expect-error - non-existing field in influencedBy
     influencedBy: ['ghost'],
     validate: async () => ({
       allowedOptions: ['London'],
-      isValid: true,
+      valid: true,
       normalizedValue: 'London',
     }),
   },
@@ -139,7 +139,7 @@ const badInfluences = defineValidationSpec<Airline>()({
     influencedBy: [],
     validate: async () => ({
       allowedOptions: ['New York'],
-      isValid: true,
+      valid: true,
       normalizedValue: 'New York',
     }),
   },
@@ -148,13 +148,13 @@ const badInfluences = defineValidationSpec<Airline>()({
     influencedBy: [],
     validate: async () => ({
       allowedOptions: ['2026-10-01'],
-      isValid: true,
+      valid: true,
       normalizedValue: '2026-10-01',
     }),
   },
   passengers: {
     requires: [],
     influencedBy: [],
-    validate: async () => ({ allowedOptions: [1], isValid: true, normalizedValue: 1 }),
+    validate: async () => ({ allowedOptions: [1], valid: true, normalizedValue: 1 }),
   },
 });
