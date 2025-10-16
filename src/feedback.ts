@@ -1,10 +1,11 @@
 import z from 'zod';
-import { tool } from 'ai';
+import { ToolCallResult } from './validation';
+import { match } from 'ts-pattern';
 
 type Tool<InputSchema extends z.ZodTypeAny, OutputSchema extends z.ZodTypeAny> = {
   inputSchema: InputSchema;
   outputSchema: OutputSchema;
-  execute: (input: z.infer<InputSchema>, options: unknown) => Promise<z.infer<OutputSchema>>;
+  execute: (input: z.infer<InputSchema>, context: unknown) => Promise<z.infer<OutputSchema>>;
   description?: string;
 };
 
@@ -44,19 +45,7 @@ export type ValidationResults<D extends DomainMap> = {
   [K in Extract<keyof D, string>]: FieldFeedback<D[K]>;
 };
 
-export type ToolzyFeedback<Value, D extends DomainMap = DomainMap> =
-  | {
-      tag: 'rejected';
-      validationResults: ValidationResults<D>;
-    }
-  | {
-      tag: 'accepted';
-      value: Value;
-    };
-
 type ToolParams<
-  LooseSchema extends z.ZodTypeAny,
-  State,
   InputSchema extends z.ZodTypeAny,
   OutputSchema extends z.ZodTypeAny,
   D extends DomainMap = DomainMap,
@@ -65,22 +54,15 @@ type ToolParams<
   outputSchema: OutputSchema;
   execute: (input: z.infer<InputSchema>, options: unknown) => Promise<z.infer<OutputSchema>>;
   description?: string;
-  looseSchema: LooseSchema;
-  fixup: (loozeValue: z.infer<LooseSchema>) => Promise<ToolzyFeedback<z.infer<InputSchema>, D>>;
-  fetchState: (loozeValue: z.infer<LooseSchema>) => Promise<State>;
+  validate: (input: z.infer<PartialSchema<InputSchema>>) => Promise<ToolCallResult<D>>;
 };
 
-export function mkTool<
-  LooseSchema extends z.ZodTypeAny,
-  State,
-  InputSchema extends z.ZodTypeAny,
-  OutputSchema extends z.ZodTypeAny,
-  D extends DomainMap = DomainMap,
->(toolParams: ToolParams<LooseSchema, State, InputSchema, OutputSchema, D>) {
-  // const paramsWithoutExecute: Omit<Tool<Input, Output>, 'execute'> = omit(toolParams, 'execute');
-  const wrappedOutputSchema = z.discriminatedUnion('tag', [
+export const mkTool2ToolResponseSchema = <OutputSchema extends z.ZodTypeAny>(
+  outputSchema: OutputSchema,
+): z.ZodTypeAny => {
+  return z.discriminatedUnion('status', [
     z.object({
-      tag: z.literal('rejected' as const),
+      status: z.literal('rejected' as const),
       validationResults: z.record(
         z.object({
           valid: z.boolean(),
@@ -89,27 +71,53 @@ export function mkTool<
         }),
       ),
     }),
-    z.object({ tag: z.literal('accepted' as const), value: toolParams.outputSchema }),
+    z.object({ status: z.literal('accepted' as const), value: outputSchema }),
   ]);
-  const cns: Tool<LooseSchema, typeof wrappedOutputSchema> = {
-    inputSchema: toolParams.looseSchema,
+};
+
+export type Tool2ToolResponseSchema<OutputSchema extends z.ZodTypeAny> = z.infer<
+  ReturnType<typeof mkTool2ToolResponseSchema<OutputSchema>>
+>;
+
+// TODO: dive deeper into the internals of Zod and make this work without infer
+export type PartialSchema<T> = {
+  [K in keyof T]: T[K] extends z.ZodTypeAny ? z.infer<ReturnType<T[K]['optional']>> : T[K];
+};
+
+export function mkTool<
+  InputSchema extends z.ZodObject<z.ZodRawShape>,
+  OutputSchema extends z.ZodTypeAny,
+  D extends DomainMap = DomainMap,
+>({
+  inputSchema,
+  outputSchema,
+  execute,
+  description,
+  validate,
+}: ToolParams<InputSchema, OutputSchema, D>): Tool<
+  PartialSchema<InputSchema>,
+  Tool2ToolResponseSchema<OutputSchema>
+> {
+  const wrappedOutputSchema = mkTool2ToolResponseSchema<OutputSchema>(outputSchema);
+  type PartialInputSchema = z.infer<PartialSchema<InputSchema>>;
+  return {
+    inputSchema: inputSchema.partial() as PartialSchema<InputSchema>,
     outputSchema: wrappedOutputSchema,
-    description: toolParams.description,
+    description: description,
     execute: async (
-      input: z.infer<LooseSchema>,
-      options: unknown,
-    ): Promise<z.infer<typeof wrappedOutputSchema>> => {
-      const fix = await toolParams.fixup(input);
-      if (fix.tag === 'rejected') {
-        return {
-          tag: 'rejected' as const,
-          validationResults: (fix as any).validationResults,
-        } as z.infer<typeof wrappedOutputSchema>;
-      }
-      const result = await toolParams.execute!(fix.value as any as z.infer<InputSchema>, options);
-      return { tag: 'accepted' as const, value: result } as z.infer<typeof wrappedOutputSchema>;
+      input: PartialInputSchema,
+      context: unknown,
+    ): Promise<Tool2ToolResponseSchema<OutputSchema>> => {
+      const validationResult = await validate(input);
+      return await match(validationResult)
+        .with({ status: 'rejected' }, async validationResult => {
+          return validationResult;
+        })
+        .with({ status: 'accepted' }, async response => {
+          const result = await execute(response.value, context);
+          return { status: 'accepted' as const, value: result };
+        })
+        .exhaustive();
     },
   };
-  const toolFn = tool as unknown as <T>(args: T) => T;
-  return toolFn(cns);
 }
