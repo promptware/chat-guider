@@ -1,7 +1,8 @@
 import z from 'zod';
-import { mkTool } from '../src/mk-tool.js';
+import { mkTool, Tool2ToolResponse } from '../src/mk-tool.js';
 import { AirlineSchedule, FlightEntry, FlightFilters } from './airline-schedule.js';
 import { uniq } from './utils.js';
+import { type Tool } from 'ai';
 
 // Our domain type for airline bookings. All fields are required.
 export const AirlineBookingSchema = z.object({
@@ -11,16 +12,6 @@ export const AirlineBookingSchema = z.object({
   passengers: z.number().min(1),
 });
 
-// Type for the LLM tool input schema. All fields are optional.
-export const AirlineBookingForLLMSchema = z.object({
-  departure: z.string().optional().describe('City of departure, if known'),
-  arrival: z.string().optional().describe('City of arrival, if known'),
-  date: z.string().optional().describe('Date of departure, if known'),
-  passengers: z.number().optional().describe('Number of passengers, if known'),
-});
-
-export type AirlineBookingForLLM = z.infer<typeof AirlineBookingForLLMSchema>;
-
 export type AirlineBooking = z.infer<typeof AirlineBookingSchema>;
 
 // Create a tool to book a flight from a pre-defined list.
@@ -28,16 +19,14 @@ export const mkAirlineBookingTool = (
   flights: FlightEntry[],
   // callback used for testing purposes
   execute: (input: AirlineBooking) => Promise<AirlineBooking>,
-) => {
+): Tool<AirlineBooking, Tool2ToolResponse<typeof AirlineBookingSchema>> => {
   const schedule = new AirlineSchedule(flights);
   // Abort controller to kill LLM inference as soon as we get the response and save some tokens
   const responseReceivedController = new AbortController();
   // Here we define our tool using a builder:
   return (
-    mkTool<AirlineBooking, typeof AirlineBookingForLLMSchema, typeof AirlineBookingSchema>({
-      schema: AirlineBookingSchema,
-      toolSchema: AirlineBookingForLLMSchema,
-      // Our tool returns the same domain type that we use for input - it just logs the value.
+    mkTool({
+      inputSchema: AirlineBookingSchema,
       outputSchema: AirlineBookingSchema,
       description: 'Airline booking tool.',
       execute: async (input: AirlineBooking) => {

@@ -1,6 +1,6 @@
 import z from 'zod';
 import { generateText, Tool } from 'ai';
-import { mkTool } from '../src/mk-tool.js';
+import { mkTool, PartialSchema, Tool2ToolResponse } from '../src/mk-tool.js';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 
 import 'dotenv/config';
@@ -38,13 +38,12 @@ const AirlineBookingForLLMSchema = z.object({
 
 type AirlineBookingForLLM = z.infer<typeof AirlineBookingForLLMSchema>;
 
-export const tool1 = mkTool<
-  AirlineBooking,
-  typeof AirlineBookingForLLMSchema,
+const tool1 = mkTool<
+  PartialSchema<AirlineBooking>,
+  typeof AirlineBookingSchema,
   typeof AirlineBookingSchema
 >({
-  schema: AirlineBookingSchema,
-  toolSchema: AirlineBookingForLLMSchema,
+  inputSchema: AirlineBookingSchema,
   outputSchema: AirlineBookingSchema,
   description: 'Validate and compute options for airline booking parameters.',
   execute: async (input: AirlineBooking) => input,

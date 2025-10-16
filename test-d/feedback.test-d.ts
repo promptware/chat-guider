@@ -1,6 +1,5 @@
 import z from 'zod';
 import { mkTool } from '../src/mk-tool.js';
-import { type Tool2ToolResponseSchema } from '../src/feedback.js';
 
 const DSchema = z.object({ a: z.string(), b: z.number() });
 type D = z.infer<typeof DSchema>;
@@ -9,8 +8,7 @@ const Out = z.object({ ok: z.boolean() });
 // Exhaustiveness should be enforced at build()
 // Building early should be a type error (no dummy arg accepted)
 mkTool<D, typeof DSchema, typeof Out>({
-  schema: DSchema,
-  toolSchema: DSchema,
+  inputSchema: DSchema,
   outputSchema: Out,
   execute: async v => ({ ok: !!v }),
 })
@@ -24,8 +22,7 @@ mkTool<D, typeof DSchema, typeof Out>({
 
 // Correct usage: both fields then build()
 mkTool<D, typeof DSchema, typeof Out>({
-  schema: DSchema,
-  toolSchema: DSchema,
+  inputSchema: DSchema,
   outputSchema: Out,
   execute: async v => ({ ok: !!v }),
 })
@@ -42,8 +39,7 @@ mkTool<D, typeof DSchema, typeof Out>({
   .build();
 
 mkTool<D, typeof DSchema, typeof Out>({
-  schema: DSchema,
-  toolSchema: DSchema,
+  inputSchema: DSchema,
   outputSchema: Out,
   execute: async v => ({ ok: !!v }),
 })
@@ -61,8 +57,7 @@ mkTool<D, typeof DSchema, typeof Out>({
   .build();
 
 mkTool<D, typeof DSchema, typeof Out>({
-  schema: DSchema,
-  toolSchema: DSchema,
+  inputSchema: DSchema,
   outputSchema: Out,
   execute: async v => ({ ok: !!v }),
 })

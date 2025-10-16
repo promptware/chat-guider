@@ -4,6 +4,7 @@ import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import 'dotenv/config';
 import { AirlineBooking, mkAirlineBookingTool } from './airline.js';
+import z from 'zod';
 
 describe('airline-booking.test.ts', () => {
   it('#1 executes and returns accepted value', async function () {
@@ -29,6 +30,7 @@ describe('airline-booking.test.ts', () => {
         responseReceivedController.abort();
         return input;
       });
+
       const _result = await generateText({
         model: createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! })('openai/gpt-5'),
         // We plug our tool here:
