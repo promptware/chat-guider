@@ -1,6 +1,6 @@
 import z from 'zod';
-import { generateText, Tool } from 'ai';
-import { mkTool, PartialSchema, Tool2ToolResponse } from '../src/mk-tool.js';
+import { generateText } from 'ai';
+import { mkTool, PartialSchema } from '../src/builder.js';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 
 import 'dotenv/config';

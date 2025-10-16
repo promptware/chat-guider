@@ -1,5 +1,6 @@
 import { detectRequiresCycles } from './graph.js';
 import { type FieldFeedback } from './feedback.js';
+import { NonEmptyArray } from './types';
 import { isDeepStrictEqual } from 'util';
 
 export type ToolCallAccepted<D extends DomainType> = {
@@ -155,10 +156,12 @@ export function compileFixup<D extends DomainType>(spec: ToolSpec<D>) {
       if (!requiresReady) {
         const missing = rule.requires.filter(dep => typeof validFields[dep] === 'undefined');
         console.log('fixup:skip (missing requirements)', { field: k, missing });
-        validationResults[k] = {
-          valid: false,
-          needsValidFields: missing,
-        };
+        if (missing.length > 0) {
+          validationResults[k] = {
+            valid: false,
+            needsValidFields: missing as unknown as NonEmptyArray<string>,
+          };
+        }
         continue;
       }
 

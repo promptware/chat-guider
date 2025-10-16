@@ -1,5 +1,5 @@
 import z from 'zod';
-import { mkTool, Tool2ToolResponse } from '../src/mk-tool.js';
+import { mkTool, Tool2ToolResponse } from '../src/builder.js';
 import { AirlineSchedule, FlightEntry, FlightFilters } from './airline-schedule.js';
 import { uniq } from './utils.js';
 import { type Tool } from 'ai';

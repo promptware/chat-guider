@@ -1,5 +1,5 @@
 import z from 'zod';
-import { mkTool } from '../src/mk-tool.js';
+import { mkTool } from '../src/builder.js';
 
 const DSchema = z.object({ a: z.string(), b: z.number() });
 type D = z.infer<typeof DSchema>;

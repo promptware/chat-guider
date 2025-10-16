@@ -1,8 +1,8 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
-import { defineToolSpec, compileFixup, toposortFields, ToolSpec } from '../src/validation.js';
+import { compileFixup, toposortFields, ToolSpec } from '../src/validation.js';
 import { ToolCallRejected } from '../src/validation.js';
-import { HiddenSpecSymbol } from '../src/mk-tool.js';
+import { HiddenSpecSymbol } from '../src/builder.js';
 import { mkAirlineBookingTool } from './airline.js';
 
 type Airline = {
